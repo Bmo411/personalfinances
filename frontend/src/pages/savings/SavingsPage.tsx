@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { financeService } from '../../services/finance';
 import { PlusCircle, Target, Loader2, ArrowRight } from 'lucide-react';
 import { Modal } from '../../components/ui/Modal';
+import { AccountSelector } from '../../components/transactions/AccountSelector';
 
 export function SavingsPage() {
     const [isAddGoalModalOpen, setIsAddGoalModalOpen] = useState(false);
@@ -204,48 +205,58 @@ function CreateGoalForm({ onSuccess }: { onSuccess: () => void }) {
 
 function AddFundsForm({ goalId, availableBalance, onSuccess }: { goalId: number, availableBalance: number, onSuccess: () => void }) {
     const [amount, setAmount] = useState('');
+    const [accountId, setAccountId] = useState<number | null>(null);
     const queryClient = useQueryClient();
 
     const mutation = useMutation({
-        mutationFn: ({ id, amt }: { id: number, amt: number }) => financeService.addFundsToSavings(id, amt),
+        mutationFn: ({ id, amt, acc_id }: { id: number, amt: number, acc_id: number }) => financeService.addFundsToSavings(id, amt, acc_id),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['savings'] });
             queryClient.invalidateQueries({ queryKey: ['summary'] });
             queryClient.invalidateQueries({ queryKey: ['transactions'] }); // Because we auto-create an expense
+            queryClient.invalidateQueries({ queryKey: ['accounts'] });
             onSuccess();
         }
     });
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        mutation.mutate({ id: goalId, amt: Number(amount) });
+        if (!accountId) return;
+        mutation.mutate({ id: goalId, amt: Number(amount), acc_id: accountId });
     };
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 overflow-visible">
             <div className="bg-blue-50 text-blue-800 p-4 rounded-xl text-sm mb-4">
-                El dinero aportado se descontará de tu Saldo Disponible principal, registrando un egreso automático a nombre de esta meta.
+                El dinero aportado registrará un egreso automático a nombre de esta meta restando fondos de la cuenta seleccionada.
             </div>
+
+            <div className="z-50 relative pb-2">
+                <AccountSelector
+                    value={accountId}
+                    onChange={setAccountId}
+                />
+            </div>
+
             <div>
                 <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
                     Monto a aportar
-                    <span className="text-xs ml-2 opacity-70">(Max disp: ${availableBalance})</span>
+                    <span className="text-xs ml-2 opacity-70">(Max Global: ${availableBalance})</span>
                 </label>
                 <input
                     type="number"
                     step="0.01"
                     min="0.01"
-                    max={availableBalance > 0 ? availableBalance : undefined}
                     value={amount}
                     onChange={e => setAmount(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl border border-brand-200 bg-[var(--bg-main)] text-[var(--text-primary)]"
+                    className="w-full px-4 py-3 rounded-xl border border-brand-200 bg-[var(--bg-main)] text-[var(--text-primary)] relative z-0"
                     placeholder="0.00"
                     required
                 />
             </div>
             <button
                 type="submit"
-                disabled={mutation.isPending || Number(amount) > availableBalance}
+                disabled={mutation.isPending || !accountId}
                 className="w-full mt-4 bg-brand-700 hover:bg-brand-900 text-white font-medium py-3 rounded-xl flex justify-center disabled:opacity-50"
             >
                 {mutation.isPending ? <Loader2 className="animate-spin" /> : 'Transferir a Meta'}

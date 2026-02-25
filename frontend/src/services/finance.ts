@@ -89,8 +89,8 @@ export const financeService = {
         const { data } = await api.post('finance/savings/', goal);
         return data as SavingsGoal;
     },
-    addFundsToSavings: async (id: number, amount: number) => {
-        const { data } = await api.post(`finance/savings/${id}/add_funds/`, { amount });
+    addFundsToSavings: async (id: number, amount: number, account_id: number) => {
+        const { data } = await api.post(`finance/savings/${id}/add_funds/`, { amount, account_id });
         return data as SavingsGoal;
     },
 
