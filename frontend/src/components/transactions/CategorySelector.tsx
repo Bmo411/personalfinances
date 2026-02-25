@@ -61,11 +61,11 @@ export function CategorySelector({ type, value, onChange }: CategorySelectorProp
 
     return (
         <div className="relative" ref={wrapperRef}>
-            <label className="block text-sm font-medium text-brand-900 mb-2">Categoría</label>
+            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">Categoría</label>
 
             <div
                 onClick={() => setIsOpen(true)}
-                className="w-full px-4 py-3 rounded-xl border border-brand-200 bg-brand-50 text-brand-900 cursor-text flex items-center justify-between"
+                className="w-full px-4 py-3 rounded-xl border border-brand-200 bg-[var(--bg-main)] text-[var(--text-primary)] cursor-text flex items-center justify-between"
             >
                 {isOpen ? (
                     <input
@@ -77,14 +77,14 @@ export function CategorySelector({ type, value, onChange }: CategorySelectorProp
                         placeholder="Buscar o crear categoría..."
                     />
                 ) : (
-                    <span className={selectedCat ? 'text-brand-900' : 'text-brand-400'}>
+                    <span className={selectedCat ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}>
                         {selectedCat ? selectedCat.name : 'Seleccionar categoría...'}
                     </span>
                 )}
             </div>
 
             {isOpen && (
-                <div className="absolute z-10 w-full mt-2 bg-white border border-brand-200 rounded-xl shadow-lg max-h-60 overflow-auto">
+                <div className="absolute z-10 w-full mt-2 bg-[var(--bg-secondary)] border border-brand-200 rounded-xl shadow-lg max-h-60 overflow-auto">
                     {isLoading ? (
                         <div className="p-4 text-center text-brand-500"><Loader2 className="animate-spin mx-auto" /></div>
                     ) : (
@@ -94,9 +94,9 @@ export function CategorySelector({ type, value, onChange }: CategorySelectorProp
                                     key={cat.id}
                                     type="button"
                                     onClick={() => { onChange(cat.id); setIsOpen(false); setSearch(''); }}
-                                    className="w-full text-left px-4 py-2 hover:bg-brand-50 flex items-center justify-between transition-colors"
+                                    className="w-full text-left px-4 py-2 hover:bg-[var(--bg-hover)] flex items-center justify-between transition-colors"
                                 >
-                                    <span className="text-brand-900">{cat.name}</span>
+                                    <span className="text-[var(--text-primary)]">{cat.name}</span>
                                     {value === cat.id && <Check size={16} className="text-brand-700" />}
                                 </button>
                             ))}
@@ -106,7 +106,7 @@ export function CategorySelector({ type, value, onChange }: CategorySelectorProp
                                     type="button"
                                     disabled={createMutation.isPending}
                                     onClick={handleCreate}
-                                    className="w-full text-left px-4 py-3 border-t border-brand-100 hover:bg-brand-50 flex items-center gap-2 text-brand-700 font-medium transition-colors"
+                                    className="w-full text-left px-4 py-3 border-t border-brand-100 hover:bg-[var(--bg-hover)] flex items-center gap-2 text-brand-700 font-medium transition-colors"
                                 >
                                     {createMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
                                     Crear "{search}"

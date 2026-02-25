@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import './index.css'
-import { App } from './App.tsx'
+import App from './App.tsx'
 import { initializeTheme } from './store/themeStore.ts'
 
 // Inject the theme class before React paints

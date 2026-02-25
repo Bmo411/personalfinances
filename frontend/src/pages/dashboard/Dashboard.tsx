@@ -17,8 +17,8 @@ export function Dashboard() {
         <div className="max-w-6xl mx-auto">
             <header className="flex justify-between items-center mb-8">
                 <div>
-                    <h1 className="text-3xl font-bold text-brand-900">Resumen Financiero</h1>
-                    <p className="text-brand-500 mt-1">Controla tus ingresos y gastos</p>
+                    <h1 className="text-3xl font-bold text-[var(--text-primary)]">Resumen Financiero</h1>
+                    <p className="text-[var(--text-secondary)] mt-1">Controla tus ingresos y gastos</p>
                 </div>
 
                 <button
@@ -31,25 +31,25 @@ export function Dashboard() {
             </header>
 
             {isLoading ? (
-                <div className="h-40 flex items-center justify-center text-brand-500">Cargando datos...</div>
+                <div className="h-40 flex items-center justify-center text-[var(--text-secondary)]">Cargando datos...</div>
             ) : (
                 <main className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="bg-white rounded-2xl p-6 shadow-sm border border-brand-200">
-                        <h2 className="text-brand-500 font-medium mb-2">Saldo Total</h2>
-                        <p className="text-4xl font-bold text-brand-900">
+                    <div className="bg-[var(--bg-secondary)] rounded-2xl p-6 shadow-sm border border-brand-200">
+                        <h2 className="text-[var(--text-secondary)] font-medium mb-2">Saldo Total</h2>
+                        <p className="text-4xl font-bold text-[var(--text-primary)]">
                             ${Number(summary?.balance || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                         </p>
                     </div>
-                    <div className="bg-white rounded-2xl p-6 shadow-sm border border-brand-200">
-                        <h2 className="text-brand-500 font-medium mb-2 flex items-center gap-2">
+                    <div className="bg-[var(--bg-secondary)] rounded-2xl p-6 shadow-sm border border-brand-200">
+                        <h2 className="text-[var(--text-secondary)] font-medium mb-2 flex items-center gap-2">
                             Ingresos <TrendingUp size={16} className="text-brand-700" />
                         </h2>
                         <p className="text-4xl font-bold text-brand-700">
                             ${Number(summary?.total_income || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                         </p>
                     </div>
-                    <div className="bg-white rounded-2xl p-6 shadow-sm border border-brand-200">
-                        <h2 className="text-brand-500 font-medium mb-2 flex items-center gap-2">
+                    <div className="bg-[var(--bg-secondary)] rounded-2xl p-6 shadow-sm border border-brand-200">
+                        <h2 className="text-[var(--text-secondary)] font-medium mb-2 flex items-center gap-2">
                             Gastos <TrendingDown size={16} className="text-brand-400" />
                         </h2>
                         <p className="text-4xl font-bold text-brand-400">
