@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { financeService } from '../../services/finance';
 import { CategorySelector } from './CategorySelector';
+import { AccountSelector } from './AccountSelector';
 import { Loader2 } from 'lucide-react';
 
 interface TransactionFormProps {
@@ -12,6 +13,7 @@ export function TransactionForm({ onSuccess }: TransactionFormProps) {
     const [type, setType] = useState<'IN' | 'OUT'>('OUT');
     const [amount, setAmount] = useState('');
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+    const [accountId, setAccountId] = useState<number | null>(null);
     const [categoryId, setCategoryId] = useState<number | null>(null);
     const [description, setDescription] = useState('');
 
@@ -28,12 +30,13 @@ export function TransactionForm({ onSuccess }: TransactionFormProps) {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!amount || !date || !categoryId) return;
+        if (!amount || !date || !categoryId || !accountId) return;
 
         mutation.mutate({
             type,
             amount,
             date,
+            account: accountId,
             category: categoryId,
             description,
             payment_method: 'CASH', // Default for now, can be expanded
@@ -88,6 +91,13 @@ export function TransactionForm({ onSuccess }: TransactionFormProps) {
                 </div>
             </div>
 
+            <div className="z-30 relative">
+                <AccountSelector
+                    value={accountId}
+                    onChange={setAccountId}
+                />
+            </div>
+
             <div className="z-20 relative">
                 <CategorySelector
                     type={type}
@@ -109,7 +119,7 @@ export function TransactionForm({ onSuccess }: TransactionFormProps) {
 
             <button
                 type="submit"
-                disabled={mutation.isPending || !categoryId || !amount}
+                disabled={mutation.isPending || !categoryId || !amount || !accountId}
                 className="w-full mt-6 bg-brand-700 hover:bg-brand-900 text-white font-medium py-3 rounded-xl shadow-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
             >
                 {mutation.isPending ? <Loader2 className="animate-spin" size={20} /> : 'Guardar Movimiento'}

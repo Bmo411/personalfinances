@@ -13,6 +13,7 @@ export interface Transaction {
     amount: string;
     type: 'IN' | 'OUT';
     date: string;
+    account: number | null;
     category: number | null;
     category_name?: string;
     payment_method: 'CASH' | 'CARD' | 'TRANSFER';
@@ -38,6 +39,16 @@ export interface Debt {
     remaining_amount: string;
     due_date: string | null;
     is_settled: boolean;
+}
+
+export interface Account {
+    id: number;
+    name: string;
+    type: 'CASH' | 'DEBIT' | 'CREDIT';
+    balance: string;
+    color: string;
+    is_active: boolean;
+    calculated_balance?: number; // Added from backend summary
 }
 
 export const financeService = {
@@ -95,5 +106,19 @@ export const financeService = {
     updateDebt: async (id: number, debt: Partial<Debt>) => {
         const { data } = await api.put(`finance/debts/${id}/`, debt);
         return data as Debt;
+    },
+
+    // Cuentas / Billeteras
+    getAccounts: async () => {
+        const { data } = await api.get('finance/accounts/');
+        return data as Account[];
+    },
+    createAccount: async (account: Partial<Account>) => {
+        const { data } = await api.post('finance/accounts/', account);
+        return data as Account;
+    },
+    updateAccount: async (id: number, account: Partial<Account>) => {
+        const { data } = await api.put(`finance/accounts/${id}/`, account);
+        return data as Account;
     }
 };

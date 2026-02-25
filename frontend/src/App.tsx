@@ -3,6 +3,7 @@ import { MainLayout } from './layouts/MainLayout'
 import { Login } from './pages/auth/Login'
 import { Dashboard } from './pages/dashboard/Dashboard'
 import { PreferencesPage } from './pages/preferences/PreferencesPage';
+import { AccountsPage } from './pages/accounts/AccountsPage';
 import { SavingsPage } from './pages/savings/SavingsPage';
 import { DebtsPage } from './pages/debts/DebtsPage';
 
@@ -19,6 +20,7 @@ function App() {
       <Route element={<MainLayout />}>
         <Route path="/" element={<Dashboard />} />
         <Route path="/preferences" element={<PreferencesPage />} />
+        <Route path="/accounts" element={<AccountsPage />} />
         <Route path="/savings" element={<SavingsPage />} />
         <Route path="/debts" element={<DebtsPage />} />
         <Route path="/history" element={<History />} />

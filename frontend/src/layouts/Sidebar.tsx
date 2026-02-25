@@ -11,6 +11,7 @@ export function cn(...inputs: (string | undefined | null | false)[]) {
 
 const navItems = [
     { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
+    { icon: Wallet2, label: 'Cuentas', path: '/accounts' },
     { icon: History, label: 'Historial', path: '/history' },
     { icon: PiggyBank, label: 'Categorías', path: '/categories' },
     { icon: Target, label: 'Ahorros', path: '/savings' },
