@@ -1,5 +1,9 @@
 version: '3.8'
 
+networks:
+  coolify:
+    external: true
+
 services:
   backend:
     build: 
@@ -19,6 +23,8 @@ services:
       - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS}
     expose:
       - '8000'
+    networks:
+      - coolify
 
   frontend:
     build:
@@ -29,6 +35,8 @@ services:
       - '80'
     depends_on:
       - backend
+    networks:
+      - coolify
 
     labels:
       - "traefik.enable=true"
