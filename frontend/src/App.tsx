@@ -6,6 +6,7 @@ import { PreferencesPage } from './pages/preferences/PreferencesPage';
 import { AccountsPage } from './pages/accounts/AccountsPage';
 import { SavingsPage } from './pages/savings/SavingsPage';
 import { DebtsPage } from './pages/debts/DebtsPage';
+import { RecurringPage } from './pages/recurring/RecurringPage';
 
 // Placeholders for views
 const History = () => <div className="p-6">Historial</div>;
@@ -21,6 +22,7 @@ function App() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/preferences" element={<PreferencesPage />} />
         <Route path="/accounts" element={<AccountsPage />} />
+        <Route path="/recurring" element={<RecurringPage />} />
         <Route path="/savings" element={<SavingsPage />} />
         <Route path="/debts" element={<DebtsPage />} />
         <Route path="/history" element={<History />} />

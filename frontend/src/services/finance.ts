@@ -51,6 +51,17 @@ export interface Account {
     calculated_balance?: number; // Added from backend summary
 }
 
+export interface RecurringExpense {
+    id: number;
+    name: string;
+    amount: string;
+    category: number | null;
+    account: number | null;
+    due_day: number;
+    is_active: boolean;
+    last_paid_date: string | null;
+}
+
 export const financeService = {
     // Categorías
     getCategories: async () => {
@@ -120,5 +131,23 @@ export const financeService = {
     updateAccount: async (id: number, account: Partial<Account>) => {
         const { data } = await api.put(`finance/accounts/${id}/`, account);
         return data as Account;
+    },
+
+    // Gastos Fijos (Recurring)
+    getRecurringExpenses: async () => {
+        const { data } = await api.get('finance/recurring/');
+        return data as RecurringExpense[];
+    },
+    createRecurringExpense: async (expense: Partial<RecurringExpense>) => {
+        const { data } = await api.post('finance/recurring/', expense);
+        return data as RecurringExpense;
+    },
+    deleteRecurringExpense: async (id: number) => {
+        const { data } = await api.delete(`finance/recurring/${id}/`);
+        return data;
+    },
+    payRecurringExpense: async (id: number, date?: string, account_id?: number) => {
+        const { data } = await api.post(`finance/recurring/${id}/pay/`, { date, account_id });
+        return data as RecurringExpense;
     }
 };

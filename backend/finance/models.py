@@ -25,6 +25,7 @@ class Transaction(models.Model):
     )
     
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='transactions')
+    account = models.ForeignKey('Account', on_delete=models.SET_NULL, null=True, blank=True, related_name='transactions')
     category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True)
     
     type = models.CharField(max_length=3, choices=TYPE_CHOICES)
@@ -84,3 +85,40 @@ class Debt(models.Model):
     
     def __str__(self):
         return f"Debt {self.type}: {self.name} - {self.remaining_amount}"
+
+class Account(models.Model):
+    TYPE_CHOICES = (
+        ('CASH', 'Efectivo'),
+        ('DEBIT', 'Tarjeta de Débito / Cuenta de Banco'),
+        ('CREDIT', 'Tarjeta de Crédito')
+    )
+    
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='accounts')
+    name = models.CharField(max_length=100)
+    type = models.CharField(max_length=10, choices=TYPE_CHOICES)
+    balance = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    color = models.CharField(max_length=7, default='#97A97C') # Hex
+    is_active = models.BooleanField(default=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return f"{self.name} ({self.type}) - ${self.balance}"
+
+class RecurringExpense(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='recurring_expenses')
+    name = models.CharField(max_length=150)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True)
+    account = models.ForeignKey(Account, on_delete=models.SET_NULL, null=True, blank=True, help_text="Default account to pay from")
+    
+    due_day = models.IntegerField(help_text="Day of the month this expense is due (1-31)")
+    is_active = models.BooleanField(default=True)
+    last_paid_date = models.DateField(null=True, blank=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return f"{self.name} - ${self.amount} (Day {self.due_day})"

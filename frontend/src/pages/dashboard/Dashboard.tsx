@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { PlusCircle, TrendingDown, TrendingUp, Wallet2 } from 'lucide-react';
+import { PlusCircle, TrendingDown, TrendingUp, Wallet2, CalendarClock } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { financeService } from '../../services/finance';
 import { Modal } from '../../components/ui/Modal';
@@ -17,6 +17,7 @@ export function Dashboard() {
     const totalIncome = Number(summary?.total_income || 0);
     const totalExpense = Number(summary?.total_expense || 0);
     const accounts = summary?.accounts || [];
+    const upcomingFixed = Number(summary?.upcoming_fixed_expenses || 0);
 
     // Calculate total networth based strictly on physical accounts instead of isolated cashflow
     const calculatedTotalNetworth = accounts.reduce((sum: number, acc: any) => {
@@ -79,6 +80,20 @@ export function Dashboard() {
                         </p>
                     </div>
                 </main>
+            )}
+
+            {!isLoading && upcomingFixed > 0 && (
+                <div className="mt-6 bg-yellow-50 border border-yellow-200 rounded-2xl p-4 flex items-center gap-4 text-yellow-800 shadow-sm">
+                    <div className="p-2 bg-yellow-100 rounded-full text-yellow-700 mt-1">
+                        <CalendarClock size={24} />
+                    </div>
+                    <div>
+                        <h3 className="font-bold text-sm">Próximos Pagos Fijos</h3>
+                        <p className="text-xs mt-0.5">
+                            Tienes <strong>${upcomingFixed.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong> destinados a gastos recurrentes este mes. Asegúrate de tener saldo suficiente.
+                        </p>
+                    </div>
+                </div>
             )}
 
             <Modal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} title="Registrar Movimiento">

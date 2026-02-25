@@ -18,13 +18,15 @@ from django.contrib import admin
 from django.urls import path, include
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework.routers import DefaultRouter
-from finance.views import CategoryViewSet, TransactionViewSet, SavingsGoalViewSet, DebtViewSet
+from finance.views import CategoryViewSet, TransactionViewSet, SavingsGoalViewSet, DebtViewSet, AccountViewSet, RecurringExpenseViewSet
 
 router = DefaultRouter()
 router.register(r'categories', CategoryViewSet, basename='category')
 router.register(r'transactions', TransactionViewSet, basename='transaction')
 router.register(r'savings', SavingsGoalViewSet, basename='saving')
 router.register(r'debts', DebtViewSet, basename='debt')
+router.register(r'accounts', AccountViewSet, basename='account')
+router.register(r'recurring', RecurringExpenseViewSet, basename='recurring')
 
 urlpatterns = [
     path('admin/', admin.site.urls),
