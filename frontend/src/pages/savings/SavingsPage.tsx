@@ -3,15 +3,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { financeService } from '../../services/finance';
 import { PlusCircle, Target, Loader2, ArrowRight } from 'lucide-react';
 import { Modal } from '../../components/ui/Modal';
-import { useThemeStore } from '../../store/themeStore';
 
 export function SavingsPage() {
     const [isAddGoalModalOpen, setIsAddGoalModalOpen] = useState(false);
     const [isAddFundsModalOpen, setIsAddFundsModalOpen] = useState(false);
     const [selectedGoalId, setSelectedGoalId] = useState<number | null>(null);
-
-    const queryClient = useQueryClient();
-    const { theme } = useThemeStore();
 
     const { data: goals = [], isLoading } = useQuery({
         queryKey: ['savings'],
