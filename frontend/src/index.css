@@ -1,16 +1,89 @@
 @import "tailwindcss";
 
+/* 
+  Dynamic CSS Variables for Theming 
+  The default is the Pastel Green theme.
+*/
+:root {
+  /* Default (Pastel Green) */
+  --bg-main: #E9F5DB;
+  --bg-secondary: #ffffff;
+  --bg-hover: #CFE1B9;
+
+  --text-primary: #1f2937;
+  /* gray-900 */
+  --text-secondary: #4b5563;
+  /* gray-600 */
+
+  --brand-50: #E9F5DB;
+  --brand-200: #CFE1B9;
+  --brand-400: #B5C99A;
+  --brand-500: #97A97C;
+  --brand-700: #87986A;
+  --brand-900: #718355;
+}
+
+/* Dark Mode Theme */
+.theme-dark {
+  --bg-main: #121212;
+  --bg-secondary: #1e1e1e;
+  --bg-hover: #2d2d2d;
+
+  --text-primary: #f3f4f6;
+  /* gray-100 */
+  --text-secondary: #9ca3af;
+  /* gray-400 */
+
+  --brand-50: #1a2318;
+  --brand-200: #2d3e2a;
+  --brand-400: #425e3c;
+  --brand-500: #598051;
+  --brand-700: #71a367;
+  --brand-900: #8bc97f;
+}
+
+/* Ocean Blue Theme */
+.theme-ocean {
+  --bg-main: #e0f2fe;
+  /* sky-100 */
+  --bg-secondary: #ffffff;
+  --bg-hover: #bae6fd;
+  /* sky-200 */
+
+  --text-primary: #0c4a6e;
+  /* sky-900 */
+  --text-secondary: #0369a1;
+  /* sky-700 */
+
+  --brand-50: #e0f2fe;
+  --brand-200: #bae6fd;
+  --brand-400: #7dd3fc;
+  --brand-500: #38bdf8;
+  --brand-700: #0284c7;
+  --brand-900: #0c4a6e;
+}
+
+/* Map CSS Variables to Tailwind v4 @theme directive */
 @theme {
-  --color-brand-50: #E9F5DB;
-  --color-brand-200: #CFE1B9;
-  --color-brand-400: #B5C99A;
-  --color-brand-500: #97A97C;
-  --color-brand-700: #87986A;
-  --color-brand-900: #718355;
+  --color-brand-50: var(--brand-50);
+  --color-brand-200: var(--brand-200);
+  --color-brand-400: var(--brand-400);
+  --color-brand-500: var(--brand-500);
+  --color-brand-700: var(--brand-700);
+  --color-brand-900: var(--brand-900);
+
+  --color-bg-main: var(--bg-main);
+  --color-bg-secondary: var(--bg-secondary);
+  --color-bg-hover: var(--bg-hover);
+
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
 }
 
 @layer base {
-  html, body {
-    @apply bg-brand-50 text-gray-900 antialiased h-full;
+
+  html,
+  body {
+    @apply bg-[var(--bg-main)] text-[var(--text-primary)] antialiased h-full transition-colors duration-300;
   }
 }
