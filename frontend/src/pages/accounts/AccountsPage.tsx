@@ -145,6 +145,13 @@ function CreateAccountForm({ onSuccess }: { onSuccess: () => void }) {
             queryClient.invalidateQueries({ queryKey: ['accounts'] });
             queryClient.invalidateQueries({ queryKey: ['summary'] });
             onSuccess();
+        },
+        onError: (error: any) => {
+            console.error("Error creating account:", error.response?.data || error.message);
+            const errorMsg = error.response?.data
+                ? JSON.stringify(error.response.data)
+                : "Error de conexión o validación al crear cuenta.";
+            alert(`No se pudo crear: ${errorMsg}`);
         }
     });
 

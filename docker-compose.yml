@@ -6,7 +6,7 @@ services:
       context: ./backend
     container_name: finance_backend
     restart: unless-stopped
-    command: 'gunicorn --bind 0.0.0.0:8000 config.wsgi:application'
+    command: sh -c "python manage.py migrate && gunicorn --bind 0.0.0.0:8000 config.wsgi:application"
     environment:
       - DB_NAME=${DB_NAME}
       - DB_USER=${DB_USER}
