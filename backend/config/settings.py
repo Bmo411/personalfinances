@@ -29,7 +29,7 @@ SECRET_KEY = 'django-insecure-2z8xwuh1u7o89a9@6q5+hib67x02s9f(uv$p3k8@igd7())-zj
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
+ALLOWED_HOSTS = (os.environ.get('ALLOWED_HOSTS') or '*').split(',')
 
 
 # Application definition
@@ -86,11 +86,11 @@ WSGI_APPLICATION = 'config.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ.get('DB_NAME', 'money_management'),
-        'USER': os.environ.get('DB_USER', 'postgres'),
-        'PASSWORD': os.environ.get('DB_PASSWORD', 'password'),
-        'HOST': os.environ.get('DB_HOST', 'localhost'),
-        'PORT': os.environ.get('DB_PORT', '5432'),
+        'NAME': os.environ.get('DB_NAME') or 'money_management',
+        'USER': os.environ.get('DB_USER') or 'postgres',
+        'PASSWORD': os.environ.get('DB_PASSWORD') or 'password',
+        'HOST': os.environ.get('DB_HOST') or 'localhost',
+        'PORT': os.environ.get('DB_PORT') or '5432',
     }
 }
 
