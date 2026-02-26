@@ -20,12 +20,15 @@ const navItems = [
     { icon: Settings, label: 'Preferencias', path: '/preferences' },
 ];
 
-export function Sidebar() {
+export function Sidebar({ isOpen, onClose }: { isOpen?: boolean, onClose?: () => void }) {
     const location = useLocation();
     const logout = useAuthStore(state => state.logout);
 
     return (
-        <aside className="w-64 bg-[var(--bg-secondary)] border-r border-brand-200 h-screen flex flex-col fixed left-0 top-0 transition-colors duration-300">
+        <aside className={cn(
+            "w-64 bg-[var(--bg-secondary)] border-r border-brand-200 h-screen flex flex-col fixed left-0 top-0 transition-transform duration-300 z-40",
+            isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+        )}>
             <div className="p-6">
                 <h1 className="text-2xl font-bold flex items-center gap-2 text-[var(--text-primary)]">
                     <Wallet2 className="text-brand-700" size={28} />
@@ -33,13 +36,14 @@ export function Sidebar() {
                 </h1>
             </div>
 
-            <nav className="flex-1 px-4 mt-6 space-y-2">
+            <nav className="flex-1 px-4 mt-6 space-y-2 overflow-y-auto pb-6">
                 {navItems.map((item) => {
                     const isActive = location.pathname === item.path;
                     return (
                         <Link
                             key={item.path}
                             to={item.path}
+                            onClick={onClose}
                             className={cn(
                                 "flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-medium",
                                 isActive

@@ -10,9 +10,8 @@ import { SavingsPage } from './pages/savings/SavingsPage';
 import { DebtsPage } from './pages/debts/DebtsPage';
 import { RecurringPage } from './pages/recurring/RecurringPage';
 
-// Placeholders for views
-const History = () => <div className="p-6">Historial</div>;
-const Categories = () => <div className="p-6">Categorías</div>;
+import { HistoryPage } from './pages/history/HistoryPage';
+import { CategoriesPage } from './pages/categories/CategoriesPage';
 
 function App() {
   return (
@@ -29,8 +28,8 @@ function App() {
           <Route path="/recurring" element={<RecurringPage />} />
           <Route path="/savings" element={<SavingsPage />} />
           <Route path="/debts" element={<DebtsPage />} />
-          <Route path="/history" element={<History />} />
-          <Route path="/categories" element={<Categories />} />
+          <Route path="/history" element={<HistoryPage />} />
+          <Route path="/categories" element={<CategoriesPage />} />
         </Route>
       </Route>
     </Routes>

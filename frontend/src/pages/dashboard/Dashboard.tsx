@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { PlusCircle, TrendingDown, TrendingUp, Wallet2, CalendarClock } from 'lucide-react';
+import { PlusCircle, TrendingDown, TrendingUp, Wallet2, CalendarClock, BarChart3 } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { useQuery } from '@tanstack/react-query';
 import { financeService } from '../../services/finance';
 import { Modal } from '../../components/ui/Modal';
@@ -19,12 +20,16 @@ export function Dashboard() {
     const accounts = summary?.accounts || [];
     const upcomingFixed = Number(summary?.upcoming_fixed_expenses || 0);
 
-    // Calculate total networth based strictly on physical accounts instead of isolated cashflow
     const calculatedTotalNetworth = accounts.reduce((sum: number, acc: any) => {
         // Credit cards are negative balances for networth
         const val = Number(acc.calculated_balance);
         return acc.type === 'CREDIT' ? sum - val : sum + val;
     }, 0);
+
+    const chartData = [
+        { name: 'Ingresos', value: totalIncome, color: '#16a34a' }, // brand-600 approx or green
+        { name: 'Egresos', value: totalExpense, color: '#ef4444' }   // red-500 approx
+    ];
 
     return (
         <div className="max-w-6xl mx-auto">
@@ -78,6 +83,31 @@ export function Dashboard() {
                         <p className="text-2xl font-bold text-red-500">
                             ${totalExpense.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                         </p>
+                    </div>
+
+                    {/* Chart Section */}
+                    <div className="bg-[var(--bg-secondary)] rounded-2xl p-6 shadow-sm border border-brand-200 md:col-span-3">
+                        <h2 className="text-[var(--text-secondary)] font-medium mb-6 flex items-center gap-2">
+                            <BarChart3 size={18} className="text-brand-600" /> Comparativa General
+                        </h2>
+                        <div className="h-64 md:h-80 w-full">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={chartData} margin={{ top: 20, right: 20, left: 0, bottom: 0 }}>
+                                    <XAxis dataKey="name" tick={{ fill: 'var(--text-secondary)' }} axisLine={false} tickLine={false} />
+                                    <YAxis tickFormatter={(value) => `$${value}`} tick={{ fill: 'var(--text-secondary)' }} axisLine={false} tickLine={false} />
+                                    <Tooltip
+                                        cursor={{ fill: 'var(--bg-hover)' }}
+                                        contentStyle={{ borderRadius: '12px', border: '1px solid var(--brand-200)', backgroundColor: 'var(--bg-main)', color: 'var(--text-primary)' }}
+                                        formatter={(value: any) => [`$${Number(value).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, 'Total']}
+                                    />
+                                    <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+                                        {chartData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={entry.color} />
+                                        ))}
+                                    </Bar>
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
                     </div>
                 </main>
             )}
