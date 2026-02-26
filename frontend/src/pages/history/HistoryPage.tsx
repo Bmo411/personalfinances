@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { financeService } from '../../services/finance';
-import { History, TrendingDown, TrendingUp, Search, Calendar } from 'lucide-react';
+import { History, TrendingDown, TrendingUp, Search, Calendar, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -9,10 +9,26 @@ export function HistoryPage() {
     const [filterType, setFilterType] = useState<'ALL' | 'IN' | 'OUT'>('ALL');
     const [searchQuery, setSearchQuery] = useState('');
 
+    const queryClient = useQueryClient();
+
     const { data: transactions = [], isLoading } = useQuery({
         queryKey: ['transactions', 'history'],
         queryFn: () => financeService.getTransactions()
     });
+
+    const deleteMutation = useMutation({
+        mutationFn: financeService.deleteTransaction,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['transactions'] });
+            queryClient.invalidateQueries({ queryKey: ['summary'] });
+        }
+    });
+
+    const handleDelete = (id: number) => {
+        if (window.confirm('¿Estás seguro de que deseas eliminar este movimiento? Esto afectará tus saldos.')) {
+            deleteMutation.mutate(id);
+        }
+    };
 
     const filteredTransactions = transactions.filter(t => {
         if (filterType !== 'ALL' && t.type !== filterType) return false;
@@ -111,10 +127,18 @@ export function HistoryPage() {
                                         {tx.category_name || 'General'}
                                     </span>
                                 </div>
-                                <div className="col-span-2 text-left md:text-right mt-1 md:mt-0 font-bold">
+                                <div className="col-span-2 text-left md:text-right mt-1 md:mt-0 font-bold flex items-center justify-between md:justify-end gap-4">
                                     <span className={tx.type === 'IN' ? 'text-brand-600' : 'text-red-500'}>
                                         {tx.type === 'IN' ? '+' : '-'}${Number(tx.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                                     </span>
+                                    <button
+                                        onClick={() => handleDelete(tx.id)}
+                                        disabled={deleteMutation.isPending}
+                                        className="text-[var(--text-secondary)] hover:text-red-500 transition-colors p-2 md:p-0 disabled:opacity-50"
+                                        title="Eliminar movimiento"
+                                    >
+                                        <Trash2 size={18} />
+                                    </button>
                                 </div>
                             </div>
                         ))}

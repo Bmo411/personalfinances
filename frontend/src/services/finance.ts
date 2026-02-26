@@ -86,6 +86,9 @@ export const financeService = {
         const { data } = await api.post('finance/transactions/transfer/', transferData);
         return data;
     },
+    deleteTransaction: async (id: number) => {
+        await api.delete(`finance/transactions/${id}/`);
+    },
 
     // Dashboard Summary
     getSummary: async (month?: number, year?: number) => {

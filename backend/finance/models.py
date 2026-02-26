@@ -35,6 +35,7 @@ class Transaction(models.Model):
     description = models.TextField(blank=True, null=True)
     payment_method = models.CharField(max_length=10, choices=METHOD_CHOICES)
     
+    is_transfer = models.BooleanField(default=False)
     is_deleted = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

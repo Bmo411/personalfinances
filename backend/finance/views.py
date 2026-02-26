@@ -41,10 +41,11 @@ class TransactionViewSet(viewsets.ModelViewSet):
     def summary(self, request):
         queryset = self.get_queryset()
         
-        incomes = queryset.filter(type='IN').aggregate(Sum('amount'))['amount__sum'] or 0
-        expenses = queryset.filter(type='OUT').aggregate(Sum('amount'))['amount__sum'] or 0
+        # Omit transfers from net income/expense calculations
+        incomes = queryset.filter(type='IN', is_transfer=False).aggregate(Sum('amount'))['amount__sum'] or 0
+        expenses = queryset.filter(type='OUT', is_transfer=False).aggregate(Sum('amount'))['amount__sum'] or 0
         
-        expenses_by_category = queryset.filter(type='OUT').values('category__name', 'category__color').annotate(total=Sum('amount')).order_by('-total')
+        expenses_by_category = queryset.filter(type='OUT', is_transfer=False).values('category__name', 'category__color').annotate(total=Sum('amount')).order_by('-total')
         
         # Calculate exactly how much money we have physically or in the bank by matching Accounts against Transactions
         accounts = Account.objects.filter(user=self.request.user)
@@ -130,7 +131,8 @@ class TransactionViewSet(viewsets.ModelViewSet):
             date=date,
             account=from_acc,
             description=desc_from,
-            payment_method='TRANSFER'
+            payment_method='TRANSFER',
+            is_transfer=True
         )
 
         Transaction.objects.create(
@@ -140,7 +142,8 @@ class TransactionViewSet(viewsets.ModelViewSet):
             date=date,
             account=to_acc,
             description=desc_to,
-            payment_method='TRANSFER'
+            payment_method='TRANSFER',
+            is_transfer=True
         )
 
         return Response({'message': 'Transfer successful'})
