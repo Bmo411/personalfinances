@@ -82,6 +82,10 @@ export const financeService = {
         const { data } = await api.post('finance/transactions/', transaction);
         return data as Transaction;
     },
+    createTransfer: async (transferData: { from_account: number, to_account: number, amount: string, date: string, description?: string }) => {
+        const { data } = await api.post('finance/transactions/transfer/', transferData);
+        return data;
+    },
 
     // Dashboard Summary
     getSummary: async (month?: number, year?: number) => {

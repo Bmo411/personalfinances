@@ -86,6 +86,65 @@ class TransactionViewSet(viewsets.ModelViewSet):
             'upcoming_fixed_expenses': upcoming_fixed_expenses
         })
 
+    @action(detail=False, methods=['post'])
+    def transfer(self, request):
+        from_account_id = request.data.get('from_account')
+        to_account_id = request.data.get('to_account')
+        amount = request.data.get('amount')
+        date = request.data.get('date', datetime.date.today())
+        description = request.data.get('description', '')
+
+        if not from_account_id or not to_account_id or not amount:
+            return Response({'error': 'from_account, to_account and amount are required'}, status=400)
+
+        if str(from_account_id) == str(to_account_id):
+            return Response({'error': 'Cannot transfer to the same account'}, status=400)
+
+        try:
+            amount = float(amount)
+            if amount <= 0:
+                return Response({'error': 'Amount must be positive'}, status=400)
+        except ValueError:
+            return Response({'error': 'Invalid amount'}, status=400)
+
+        user = self.request.user
+        
+        from_acc = Account.objects.filter(id=from_account_id, user=user).first()
+        to_acc = Account.objects.filter(id=to_account_id, user=user).first()
+        
+        if not from_acc or not to_acc:
+            return Response({'error': 'One or both accounts not found or invalid'}, status=404)
+
+        desc_from = f"Transferencia a {to_acc.name}"
+        if description:
+            desc_from += f" ({description})"
+            
+        desc_to = f"Transferencia de {from_acc.name}"
+        if description:
+            desc_to += f" ({description})"
+
+        Transaction.objects.create(
+            user=user,
+            type='OUT',
+            amount=amount,
+            date=date,
+            account=from_acc,
+            description=desc_from,
+            payment_method='TRANSFER'
+        )
+
+        Transaction.objects.create(
+            user=user,
+            type='IN',
+            amount=amount,
+            date=date,
+            account=to_acc,
+            description=desc_to,
+            payment_method='TRANSFER'
+        )
+
+        return Response({'message': 'Transfer successful'})
+
 class SavingsGoalViewSet(viewsets.ModelViewSet):
     serializer_class = SavingsGoalSerializer
     permission_classes = [IsAuthenticated]

@@ -10,17 +10,18 @@ interface TransactionFormProps {
 }
 
 export function TransactionForm({ onSuccess }: TransactionFormProps) {
-    const [type, setType] = useState<'IN' | 'OUT'>('OUT');
+    const [type, setType] = useState<'IN' | 'OUT' | 'TRANSFER'>('OUT');
     const [amount, setAmount] = useState('');
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
     const [accountId, setAccountId] = useState<number | null>(null);
+    const [toAccountId, setToAccountId] = useState<number | null>(null);
     const [categoryId, setCategoryId] = useState<number | null>(null);
     const [description, setDescription] = useState('');
 
     const queryClient = useQueryClient();
 
     const mutation = useMutation({
-        mutationFn: financeService.createTransaction,
+        mutationFn: (data: any) => type === 'TRANSFER' ? financeService.createTransfer(data) : financeService.createTransaction(data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['transactions'] });
             queryClient.invalidateQueries({ queryKey: ['summary'] });
@@ -30,18 +31,33 @@ export function TransactionForm({ onSuccess }: TransactionFormProps) {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!amount || !date || !categoryId || !accountId) return;
 
-        mutation.mutate({
-            type,
-            amount,
-            date,
-            account: accountId,
-            category: categoryId,
-            description,
-            payment_method: 'CASH', // Default for now, can be expanded
-        });
+        if (type === 'TRANSFER') {
+            if (!amount || !date || !accountId || !toAccountId) return;
+            mutation.mutate({
+                from_account: accountId,
+                to_account: toAccountId,
+                amount,
+                date,
+                description
+            });
+        } else {
+            if (!amount || !date || !categoryId || !accountId) return;
+            mutation.mutate({
+                type,
+                amount,
+                date,
+                account: accountId,
+                category: categoryId,
+                description,
+                payment_method: 'CASH', // Default for now, can be expanded
+            });
+        }
     };
+
+    const isButtonDisabled = type === 'TRANSFER'
+        ? (mutation.isPending || !amount || !accountId || !toAccountId)
+        : (mutation.isPending || !categoryId || !amount || !accountId);
 
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -62,6 +78,14 @@ export function TransactionForm({ onSuccess }: TransactionFormProps) {
                         }`}
                 >
                     Ingreso
+                </button>
+                <button
+                    type="button"
+                    onClick={() => { setType('TRANSFER'); setCategoryId(null); }}
+                    className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${type === 'TRANSFER' ? 'bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-sm' : 'text-brand-700 hover:text-[var(--text-primary)]'
+                        }`}
+                >
+                    Transferencia
                 </button>
             </div>
 
@@ -91,20 +115,41 @@ export function TransactionForm({ onSuccess }: TransactionFormProps) {
                 </div>
             </div>
 
-            <div className="z-30 relative">
-                <AccountSelector
-                    value={accountId}
-                    onChange={setAccountId}
-                />
-            </div>
-
-            <div className="z-20 relative">
-                <CategorySelector
-                    type={type}
-                    value={categoryId}
-                    onChange={setCategoryId}
-                />
-            </div>
+            {type === 'TRANSFER' ? (
+                <>
+                    <div className="z-30 relative space-y-2">
+                        <label className="block text-sm font-medium text-[var(--text-secondary)]">Cuenta Origen</label>
+                        <AccountSelector
+                            value={accountId}
+                            onChange={setAccountId}
+                        />
+                    </div>
+                    <div className="z-20 relative space-y-2">
+                        <label className="block text-sm font-medium text-[var(--text-secondary)]">Cuenta Destino</label>
+                        <AccountSelector
+                            value={toAccountId}
+                            onChange={setToAccountId}
+                        />
+                    </div>
+                </>
+            ) : (
+                <>
+                    <div className="z-30 relative space-y-2">
+                        <label className="block text-sm font-medium text-[var(--text-secondary)]">Cuenta</label>
+                        <AccountSelector
+                            value={accountId}
+                            onChange={setAccountId}
+                        />
+                    </div>
+                    <div className="z-20 relative space-y-2">
+                        <CategorySelector
+                            type={type}
+                            value={categoryId}
+                            onChange={setCategoryId}
+                        />
+                    </div>
+                </>
+            )}
 
             <div>
                 <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">Descripción (Opcional)</label>
@@ -113,13 +158,13 @@ export function TransactionForm({ onSuccess }: TransactionFormProps) {
                     value={description}
                     onChange={e => setDescription(e.target.value)}
                     className="w-full px-4 py-3 rounded-xl border border-brand-200 focus:outline-none focus:ring-2 focus:ring-brand-500 bg-[var(--bg-main)] text-[var(--text-primary)]"
-                    placeholder="Ej: Compra de supermercado..."
+                    placeholder={type === 'TRANSFER' ? "Ej: Traspaso a ahorros..." : "Ej: Compra de supermercado..."}
                 />
             </div>
 
             <button
                 type="submit"
-                disabled={mutation.isPending || !categoryId || !amount || !accountId}
+                disabled={isButtonDisabled}
                 className="w-full mt-6 bg-brand-700 hover:bg-brand-900 text-white font-medium py-3 rounded-xl shadow-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
             >
                 {mutation.isPending ? <Loader2 className="animate-spin" size={20} /> : 'Guardar Movimiento'}
