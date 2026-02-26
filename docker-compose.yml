@@ -25,6 +25,11 @@ services:
       - '8000'
     networks:
       - coolify
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.finance-api.rule=Host(`api-finanzas.blueberrieslab.com`)"
+      - "traefik.http.routers.finance-api.entrypoints=http,https"
+      - "traefik.http.services.finance-api.loadbalancer.server.port=8000"
 
   frontend:
     build:
