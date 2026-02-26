@@ -54,13 +54,8 @@ class TransactionViewSet(viewsets.ModelViewSet):
             # We must sum all incomes towards this account and subtract all expenses from it
             # Initial balance + (Incomes) - (Expenses)
             # IMPORTANT: For account balances, we MUST include transfers, so we query the DB directly, not the filtered queryset!
+            # AND we MUST NOT filter by date, because an account balance is the sum of ALL history.
             account_txs = Transaction.objects.filter(user=self.request.user, is_deleted=False, account=account)
-            
-            # Apply date filters if they exist for the account balance snapshot
-            month = self.request.query_params.get('month', None)
-            year = self.request.query_params.get('year', None)
-            if month and year:
-                account_txs = account_txs.filter(date__year=year, date__month=month)
             
             acc_incomes = account_txs.filter(type='IN').aggregate(Sum('amount'))['amount__sum'] or 0
             acc_expenses = account_txs.filter(type='OUT').aggregate(Sum('amount'))['amount__sum'] or 0
