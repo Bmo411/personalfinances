@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { financeService } from '../../services/finance';
-import { PlusCircle, Users, Loader2, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { PlusCircle, Users, Loader2, ArrowRight, CheckCircle2, Trash2 } from 'lucide-react';
 import { Modal } from '../../components/ui/Modal';
 
 export function DebtsPage() {
@@ -10,10 +10,25 @@ export function DebtsPage() {
     const [selectedDebtId, setSelectedDebtId] = useState<number | null>(null);
     const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
 
+    const queryClient = useQueryClient();
+
     const { data: debts = [], isLoading } = useQuery({
         queryKey: ['debts'],
         queryFn: financeService.getDebts
     });
+
+    const deleteMutation = useMutation({
+        mutationFn: financeService.deleteDebt,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['debts'] });
+        }
+    });
+
+    const handleDelete = (id: number) => {
+        if (window.confirm('¿Estás seguro de que quieres eliminar este registro?')) {
+            deleteMutation.mutate(id);
+        }
+    };
 
     const filteredDebts = debts.filter(d => d.type === activeTab);
 
@@ -101,17 +116,26 @@ export function DebtsPage() {
                                 </div>
                             </div>
 
-                            {!debt.is_settled && (
+                            <div className="flex gap-2">
                                 <button
-                                    onClick={() => {
-                                        setSelectedDebtId(debt.id);
-                                        setIsPaymentModalOpen(true);
-                                    }}
-                                    className="px-4 py-2 bg-[var(--bg-main)] hover:bg-[var(--bg-hover)] text-[var(--text-primary)] rounded-lg transition-colors border border-brand-200 flex items-center justify-center gap-2"
+                                    onClick={() => handleDelete(debt.id)}
+                                    className="p-2 bg-[var(--bg-main)] hover:bg-red-50 hover:text-red-500 text-[var(--text-secondary)] rounded-lg transition-colors border border-brand-200 flex items-center justify-center"
+                                    title="Eliminar"
                                 >
-                                    {activeTab === 'I_OWE' ? 'Abonar' : 'Recibir Pago'} <ArrowRight size={16} />
+                                    <Trash2 size={18} />
                                 </button>
-                            )}
+                                {!debt.is_settled && (
+                                    <button
+                                        onClick={() => {
+                                            setSelectedDebtId(debt.id);
+                                            setIsPaymentModalOpen(true);
+                                        }}
+                                        className="px-4 py-2 bg-[var(--bg-main)] hover:bg-[var(--bg-hover)] text-[var(--text-primary)] rounded-lg transition-colors border border-brand-200 flex items-center justify-center gap-2"
+                                    >
+                                        {activeTab === 'I_OWE' ? 'Abonar' : 'Recibir Pago'} <ArrowRight size={16} />
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     ))}
                 </div>

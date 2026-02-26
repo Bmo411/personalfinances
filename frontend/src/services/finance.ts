@@ -115,8 +115,12 @@ export const financeService = {
         return data as Debt;
     },
     updateDebt: async (id: number, debt: Partial<Debt>) => {
-        const { data } = await api.put(`finance/debts/${id}/`, debt);
+        const { data } = await api.patch(`finance/debts/${id}/`, debt);
         return data as Debt;
+    },
+    deleteDebt: async (id: number) => {
+        const { data } = await api.delete(`finance/debts/${id}/`);
+        return data;
     },
 
     // Cuentas / Billeteras
