@@ -192,6 +192,46 @@ class SavingsGoalViewSet(viewsets.ModelViewSet):
             date=request.data.get('date') or datetime.date.today(),
             description=f'Depósito a meta de ahorro: {goal.name}',
             payment_method='TRANSFER',
+            is_transfer=True # Considered a transfer conceptually, protects from gross expense calculations
+        )
+        
+        return Response(SavingsGoalSerializer(goal).data)
+
+    @action(detail=True, methods=['post'])
+    def withdraw_funds(self, request, pk=None):
+        goal = self.get_object()
+        amount = request.data.get('amount')
+        
+        if not amount:
+            return Response({'error': 'Amount must be provided'}, status=400)
+            
+        try:
+            amount = float(amount)
+            if amount <= 0:
+                return Response({'error': 'Amount must be positive'}, status=400)
+        except ValueError:
+            return Response({'error': 'Invalid amount'}, status=400)
+            
+        if amount > goal.current_amount:
+            return Response({'error': 'Cannot withdraw more than current amount'}, status=400)
+            
+        goal.current_amount -= amount
+        if goal.current_amount < goal.target_amount:
+            goal.is_completed = False
+        goal.save()
+        
+        # Register an "Income" to add back to the main available balance
+        account_id = request.data.get('account_id')
+        
+        Transaction.objects.create(
+            user=self.request.user,
+            type='IN',
+            account_id=account_id if account_id else None,
+            amount=amount,
+            date=request.data.get('date') or datetime.date.today(),
+            description=f'Retiro de meta de ahorro: {goal.name}',
+            payment_method='TRANSFER',
+            is_transfer=True # Considered a transfer conceptually, protects from gross income calculations
         )
         
         return Response(SavingsGoalSerializer(goal).data)

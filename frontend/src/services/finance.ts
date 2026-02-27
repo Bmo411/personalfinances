@@ -44,7 +44,7 @@ export interface Debt {
 export interface Account {
     id: number;
     name: string;
-    type: 'CASH' | 'DEBIT' | 'CREDIT';
+    type: 'CASH' | 'DEBIT' | 'CREDIT' | 'SAVINGS';
     balance: string;
     color: string;
     is_active: boolean;
@@ -109,6 +109,10 @@ export const financeService = {
     },
     addFundsToSavings: async (id: number, amount: number, account_id: number) => {
         const { data } = await api.post(`finance/savings/${id}/add_funds/`, { amount, account_id });
+        return data as SavingsGoal;
+    },
+    withdrawFundsFromSavings: async (id: number, amount: number, account_id: number) => {
+        const { data } = await api.post(`finance/savings/${id}/withdraw_funds/`, { amount, account_id });
         return data as SavingsGoal;
     },
 

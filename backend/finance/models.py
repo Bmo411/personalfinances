@@ -91,7 +91,8 @@ class Account(models.Model):
     TYPE_CHOICES = (
         ('CASH', 'Efectivo'),
         ('DEBIT', 'Tarjeta de Débito / Cuenta de Banco'),
-        ('CREDIT', 'Tarjeta de Crédito')
+        ('CREDIT', 'Tarjeta de Crédito'),
+        ('SAVINGS', 'Cuenta de Ahorro / Inversión')
     )
     
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='accounts')

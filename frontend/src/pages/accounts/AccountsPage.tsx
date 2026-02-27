@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { financeService } from '../../services/finance';
-import { PlusCircle, Wallet, Loader2, CreditCard, Landmark } from 'lucide-react';
+import { PlusCircle, Wallet, Loader2, CreditCard, Landmark, Target } from 'lucide-react';
 import { Modal } from '../../components/ui/Modal';
 
 export function AccountsPage() {
@@ -30,9 +30,10 @@ export function AccountsPage() {
     const totalCash = enrichedAccounts.filter(a => a.type === 'CASH').reduce((sum, a) => sum + Number(a.calculated_balance), 0);
     const totalBank = enrichedAccounts.filter(a => a.type === 'DEBIT').reduce((sum, a) => sum + Number(a.calculated_balance), 0);
     const totalCredit = enrichedAccounts.filter(a => a.type === 'CREDIT').reduce((sum, a) => sum + Number(a.calculated_balance), 0);
+    const totalSavings = enrichedAccounts.filter(a => a.type === 'SAVINGS').reduce((sum, a) => sum + Number(a.calculated_balance), 0);
 
-    // Net total (Cash + Bank - Credit obligations roughly)
-    const netTotal = totalCash + totalBank - totalCredit;
+    // Net total (Cash + Bank + Savings - Credit obligations)
+    const netTotal = totalCash + totalBank + totalSavings - totalCredit;
 
     return (
         <div className="max-w-6xl mx-auto">
@@ -52,7 +53,7 @@ export function AccountsPage() {
             </header>
 
             {/* General Overview */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
                 <div className="md:col-span-2 bg-gradient-to-r from-brand-700 to-brand-900 text-white rounded-2xl p-6 shadow-sm flex flex-col justify-center">
                     <h2 className="text-brand-100 font-medium mb-1">Patrimonio Líquido</h2>
                     <p className="text-4xl font-bold">
@@ -61,20 +62,29 @@ export function AccountsPage() {
                 </div>
 
                 <div className="bg-[var(--bg-secondary)] rounded-2xl p-6 shadow-sm border border-brand-200">
-                    <div className="flex items-center gap-2 text-[var(--text-secondary)] font-medium mb-2">
-                        <Landmark size={20} /> En Bancos
+                    <div className="flex items-center gap-2 text-[var(--text-secondary)] font-medium mb-2 text-sm">
+                        <Landmark size={18} /> Bancos
                     </div>
-                    <p className="text-2xl font-bold text-[var(--text-primary)]">
+                    <p className="text-xl font-bold text-[var(--text-primary)]">
                         ${totalBank.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </p>
                 </div>
 
                 <div className="bg-[var(--bg-secondary)] rounded-2xl p-6 shadow-sm border border-brand-200">
-                    <div className="flex items-center gap-2 text-[var(--text-secondary)] font-medium mb-2">
-                        <Wallet size={20} /> En Efectivo
+                    <div className="flex items-center gap-2 text-[var(--text-secondary)] font-medium mb-2 text-sm">
+                        <Wallet size={18} /> Efectivo
                     </div>
-                    <p className="text-2xl font-bold text-[var(--text-primary)]">
+                    <p className="text-xl font-bold text-[var(--text-primary)]">
                         ${totalCash.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    </p>
+                </div>
+
+                <div className="bg-[var(--bg-secondary)] rounded-2xl p-6 shadow-sm border border-brand-200">
+                    <div className="flex items-center gap-2 text-[var(--text-secondary)] font-medium mb-2 text-sm">
+                        <Loader2 size={18} /> Inversiones
+                    </div>
+                    <p className="text-xl font-bold text-[var(--text-primary)]">
+                        ${totalSavings.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </p>
                 </div>
             </div>
@@ -93,7 +103,7 @@ export function AccountsPage() {
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {enrichedAccounts.map(account => {
-                        const Icon = account.type === 'CASH' ? Wallet : (account.type === 'CREDIT' ? CreditCard : Landmark);
+                        const Icon = account.type === 'CASH' ? Wallet : (account.type === 'CREDIT' ? CreditCard : (account.type === 'SAVINGS' ? Target : Landmark));
 
                         return (
                             <div key={account.id} className="bg-[var(--bg-secondary)] rounded-2xl p-6 shadow-sm border border-brand-200 relative overflow-hidden group hover:border-brand-400 transition-colors">
@@ -103,7 +113,7 @@ export function AccountsPage() {
                                     </div>
                                     <div className="text-right">
                                         <div className="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">
-                                            {account.type === 'CASH' ? 'Efectivo' : (account.type === 'CREDIT' ? 'Crédito' : 'Débito/Banco')}
+                                            {account.type === 'CASH' ? 'Efectivo' : (account.type === 'CREDIT' ? 'Crédito' : (account.type === 'SAVINGS' ? 'Ahorro / Inversión' : 'Débito/Banco'))}
                                         </div>
                                     </div>
                                 </div>
@@ -183,6 +193,7 @@ function CreateAccountForm({ onSuccess }: { onSuccess: () => void }) {
                 >
                     <option value="DEBIT">Cuenta Bancaria / Tarjeta de Débito</option>
                     <option value="CASH">Efectivo / Cartera / Caja Fuerte</option>
+                    <option value="SAVINGS">Cuenta de Ahorro / Inversión</option>
                     <option value="CREDIT">Tarjeta de Crédito</option>
                 </select>
             </div>

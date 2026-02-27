@@ -8,6 +8,7 @@ import { AccountSelector } from '../../components/transactions/AccountSelector';
 export function SavingsPage() {
     const [isAddGoalModalOpen, setIsAddGoalModalOpen] = useState(false);
     const [isAddFundsModalOpen, setIsAddFundsModalOpen] = useState(false);
+    const [isWithdrawFundsModalOpen, setIsWithdrawFundsModalOpen] = useState(false);
     const [selectedGoalId, setSelectedGoalId] = useState<number | null>(null);
 
     const { data: goals = [], isLoading } = useQuery({
@@ -44,11 +45,13 @@ export function SavingsPage() {
         return sum;
     }, 0);
 
+    const savingsAccounts = enrichedAccounts.filter(a => a.type === 'SAVINGS');
+
     return (
         <div className="max-w-6xl mx-auto">
             <header className="flex justify-between items-center mb-8">
                 <div>
-                    <h1 className="text-3xl font-bold text-[var(--text-primary)]">Metas de Ahorro</h1>
+                    <h1 className="text-3xl font-bold text-[var(--text-primary)]">Ahorros e Inversiones</h1>
                     <p className="text-[var(--text-secondary)] mt-1">
                         Protege tu dinero separándolo de tu saldo disponible
                     </p>
@@ -70,9 +73,9 @@ export function SavingsPage() {
                         <Target size={32} />
                     </div>
                     <div>
-                        <h2 className="text-[var(--text-secondary)] font-medium">Ahorro Total Acumulado</h2>
+                        <h2 className="text-[var(--text-secondary)] font-medium">Ahorro y Metas Acumuladas</h2>
                         <p className="text-4xl font-bold text-[var(--text-primary)]">
-                            ${totalSaved.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                            ${(totalSaved + savingsAccounts.reduce((sum, a) => sum + Number(a.calculated_balance), 0)).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                         </p>
                     </div>
                 </div>
@@ -87,6 +90,38 @@ export function SavingsPage() {
                     </p>
                 </div>
             </div>
+
+            {/* Cuentas de Ahorro */}
+            {savingsAccounts.length > 0 && (
+                <div className="mb-10">
+                    <h2 className="text-xl font-bold text-[var(--text-primary)] mb-4 flex items-center gap-2"><Target size={24} className="text-brand-700" /> Cuentas de Inversión / Ahorro</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {savingsAccounts.map(account => (
+                            <div key={account.id} className="bg-[var(--bg-secondary)] rounded-2xl p-6 shadow-sm border border-brand-200 relative overflow-hidden group hover:border-brand-400 transition-colors">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="p-3 bg-brand-50 rounded-xl" style={{ color: account.color || '#97A97C' }}>
+                                        <Target size={24} />
+                                    </div>
+                                    <div className="text-right">
+                                        <div className="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">
+                                            Cuenta de Ahorro
+                                        </div>
+                                    </div>
+                                </div>
+                                <h3 className="font-bold text-lg text-[var(--text-primary)]">{account.name}</h3>
+                                <div className="mt-4 pt-4 border-t border-brand-100 flex justify-between items-end">
+                                    <div>
+                                        <p className="text-xs text-[var(--text-secondary)] mb-1">Balance Actual</p>
+                                        <p className="text-2xl font-bold text-brand-700">
+                                            ${Number(account.calculated_balance).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             {/* Lista de Metas */}
             {isLoading ? (
@@ -134,16 +169,28 @@ export function SavingsPage() {
                                     />
                                 </div>
 
-                                <button
-                                    onClick={() => {
-                                        setSelectedGoalId(goal.id);
-                                        setIsAddFundsModalOpen(true);
-                                    }}
-                                    disabled={goal.is_completed}
-                                    className="w-full flex items-center justify-center gap-2 py-2 mt-2 rounded-lg bg-[var(--bg-main)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-50"
-                                >
-                                    <ArrowRight size={16} /> Aportar a meta
-                                </button>
+                                <div className="flex gap-2 mt-2">
+                                    <button
+                                        onClick={() => {
+                                            setSelectedGoalId(goal.id);
+                                            setIsAddFundsModalOpen(true);
+                                        }}
+                                        disabled={goal.is_completed}
+                                        className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg bg-[var(--bg-main)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-50 text-sm"
+                                    >
+                                        <ArrowRight size={16} /> Aportar
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setSelectedGoalId(goal.id);
+                                            setIsWithdrawFundsModalOpen(true);
+                                        }}
+                                        disabled={current <= 0}
+                                        className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg bg-[var(--bg-main)] text-brand-700 hover:bg-brand-50 transition-colors disabled:opacity-50 text-sm border border-brand-100"
+                                    >
+                                        Retirar
+                                    </button>
+                                </div>
                             </div>
                         )
                     })}
@@ -161,6 +208,17 @@ export function SavingsPage() {
                         goalId={selectedGoalId}
                         availableBalance={availableBalance}
                         onSuccess={() => { setIsAddFundsModalOpen(false); setSelectedGoalId(null); }}
+                    />
+                )}
+            </Modal>
+
+            <Modal isOpen={isWithdrawFundsModalOpen} onClose={() => { setIsWithdrawFundsModalOpen(false); setSelectedGoalId(null); }} title="Retirar de Meta">
+                {selectedGoalId && (
+                    <WithdrawFundsForm
+                        goalId={selectedGoalId}
+                        goalName={goals.find(g => g.id === selectedGoalId)?.name || ''}
+                        maxAmount={Number(goals.find(g => g.id === selectedGoalId)?.current_amount || 0)}
+                        onSuccess={() => { setIsWithdrawFundsModalOpen(false); setSelectedGoalId(null); }}
                     />
                 )}
             </Modal>
@@ -281,6 +339,73 @@ function AddFundsForm({ goalId, availableBalance, onSuccess }: { goalId: number,
                 className="w-full mt-4 bg-brand-700 hover:bg-brand-900 text-white font-medium py-3 rounded-xl flex justify-center disabled:opacity-50"
             >
                 {mutation.isPending ? <Loader2 className="animate-spin" /> : 'Transferir a Meta'}
+            </button>
+        </form>
+    );
+}
+
+function WithdrawFundsForm({ goalId, goalName, maxAmount, onSuccess }: { goalId: number, goalName: string, maxAmount: number, onSuccess: () => void }) {
+    const [amount, setAmount] = useState('');
+    const [accountId, setAccountId] = useState<number | null>(null);
+    const queryClient = useQueryClient();
+
+    const mutation = useMutation({
+        mutationFn: ({ id, amt, acc_id }: { id: number, amt: number, acc_id: number }) => financeService.withdrawFundsFromSavings(id, amt, acc_id),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['savings'] });
+            queryClient.invalidateQueries({ queryKey: ['summary'] });
+            queryClient.invalidateQueries({ queryKey: ['transactions'] }); // Because we auto-create an income transfer
+            queryClient.invalidateQueries({ queryKey: ['accounts'] });
+            onSuccess();
+        },
+        onError: (error: any) => {
+            alert(error.response?.data?.error || 'Error al retirar fondos');
+        }
+    });
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!accountId) return;
+        mutation.mutate({ id: goalId, amt: Number(amount), acc_id: accountId });
+    };
+
+    return (
+        <form onSubmit={handleSubmit} className="space-y-4 overflow-visible">
+            <div className="bg-brand-50 text-brand-800 p-4 rounded-xl text-sm mb-4">
+                El dinero retirado de <strong>{goalName}</strong> ingresará de vuelta como disponible a la cuenta destino que selecciones.
+            </div>
+
+            <div className="z-50 relative pb-2">
+                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">Cuenta Destino</label>
+                <AccountSelector
+                    value={accountId}
+                    onChange={setAccountId}
+                />
+            </div>
+
+            <div>
+                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                    Monto a retirar
+                    <span className="text-xs ml-2 opacity-70">(Max: ${maxAmount})</span>
+                </label>
+                <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    max={maxAmount}
+                    value={amount}
+                    onChange={e => setAmount(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border border-brand-200 bg-[var(--bg-main)] text-[var(--text-primary)] relative z-0"
+                    placeholder="0.00"
+                    required
+                />
+            </div>
+            <button
+                type="submit"
+                disabled={mutation.isPending || !accountId}
+                className="w-full mt-4 bg-brand-700 hover:bg-brand-900 text-white font-medium py-3 rounded-xl flex justify-center disabled:opacity-50"
+            >
+                {mutation.isPending ? <Loader2 className="animate-spin" /> : 'Retirar y Regresar a Cuenta'}
             </button>
         </form>
     );
