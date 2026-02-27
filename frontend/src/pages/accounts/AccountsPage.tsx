@@ -23,7 +23,7 @@ export function AccountsPage() {
         const summaryMatch = summary?.accounts?.find((s: any) => s.id === acc.id);
         return {
             ...acc,
-            calculated_balance: summaryMatch?.calculated_balance || acc.balance
+            calculated_balance: summaryMatch?.calculated_balance ?? acc.balance
         };
     });
 
