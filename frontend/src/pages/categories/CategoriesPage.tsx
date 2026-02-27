@@ -114,19 +114,40 @@ export function CategoriesPage() {
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    {filteredCategories.map(cat => (
-                                        <div key={cat.id} className="flex items-center justify-between p-4 rounded-xl border border-brand-100 hover:border-brand-300 transition-colors bg-[var(--bg-main)]">
-                                            <div className="flex items-center gap-3">
-                                                <div
-                                                    className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold"
-                                                    style={{ backgroundColor: cat.color || '#9ca3af' }}
-                                                >
-                                                    {cat.name.charAt(0).toUpperCase()}
+                                    {filteredCategories.map(cat => {
+                                        // To handle dynamic hover colors in React without inline hover, we use a custom property
+                                        // and a small utility class trick or simple inline style for the border.
+                                        return (
+                                            <div
+                                                key={cat.id}
+                                                className="group flex items-center justify-between p-4 rounded-xl border transition-all bg-[var(--bg-main)]"
+                                                style={{
+                                                    borderColor: 'var(--brand-100)',
+                                                    // CSS variable used to style on hover via Tailwind
+                                                    '--hover-border': cat.color || '#9ca3af',
+                                                    '--hover-bg': `${cat.color}15` || '#f3f4f6' // 15 is hex opacity (approx 8%)
+                                                } as React.CSSProperties}
+                                                onMouseEnter={(e) => {
+                                                    e.currentTarget.style.borderColor = cat.color || '#9ca3af';
+                                                    e.currentTarget.style.backgroundColor = `${cat.color}15` || '#f3f4f6';
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                    e.currentTarget.style.borderColor = 'var(--brand-100)';
+                                                    e.currentTarget.style.backgroundColor = 'var(--bg-main)';
+                                                }}
+                                            >
+                                                <div className="flex items-center gap-3 relative z-10">
+                                                    <div
+                                                        className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold shadow-sm"
+                                                        style={{ backgroundColor: cat.color || '#9ca3af' }}
+                                                    >
+                                                        {cat.name.charAt(0).toUpperCase()}
+                                                    </div>
+                                                    <div className="font-medium text-[var(--text-primary)] group-hover:text-brand-900 transition-colors">{cat.name}</div>
                                                 </div>
-                                                <div className="font-medium text-[var(--text-primary)]">{cat.name}</div>
                                             </div>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             )}
                         </div>

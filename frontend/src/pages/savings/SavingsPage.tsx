@@ -15,13 +15,34 @@ export function SavingsPage() {
         queryFn: financeService.getSavingsGoals
     });
 
+    const { data: accounts = [] } = useQuery({
+        queryKey: ['accounts'],
+        queryFn: financeService.getAccounts
+    });
+
     const { data: summary } = useQuery({
         queryKey: ['summary'],
         queryFn: () => financeService.getSummary()
     });
 
+    // Merge database accounts with their running calculated balances from the backend summary
+    const enrichedAccounts = accounts.map(acc => {
+        const summaryMatch = summary?.accounts?.find((s: any) => s.id === acc.id);
+        return {
+            ...acc,
+            calculated_balance: summaryMatch?.calculated_balance ?? acc.balance
+        };
+    });
+
     const totalSaved = goals.reduce((sum, goal) => sum + Number(goal.current_amount), 0);
-    const availableBalance = Number(summary?.balance || 0);
+
+    // Calculate liquid available balance exactly like in AccountsPage
+    const availableBalance = enrichedAccounts.reduce((sum, a) => {
+        const val = Number(a.calculated_balance);
+        if (a.type === 'CASH' || a.type === 'DEBIT') return sum + val;
+        if (a.type === 'CREDIT') return sum - val;
+        return sum;
+    }, 0);
 
     return (
         <div className="max-w-6xl mx-auto">
