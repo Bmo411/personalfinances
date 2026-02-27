@@ -68,16 +68,22 @@ export function CategoriesPage() {
                                         cy="50%"
                                         innerRadius={60}
                                         outerRadius={90}
-                                        paddingAngle={5}
+                                        paddingAngle={2}
                                         dataKey="value"
+                                        stroke="none"
                                     >
                                         {expensesData.map((entry: any, index: number) => (
-                                            <Cell key={`cell-${index}`} fill={entry.color} />
+                                            <Cell
+                                                key={`cell-${index}`}
+                                                fill={entry.color}
+                                                stroke="var(--bg-secondary)"
+                                                strokeWidth={2}
+                                            />
                                         ))}
                                     </Pie>
                                     <Tooltip
-                                        formatter={(value: any) => [`$${Number(value).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, 'Total']}
-                                        contentStyle={{ borderRadius: '12px', border: '1px solid var(--brand-200)' }}
+                                        formatter={(value: any, name: any) => [`$${Number(value).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, name]}
+                                        contentStyle={{ borderRadius: '12px', border: '1px solid var(--brand-200)', backgroundColor: 'var(--bg-main)', color: 'var(--text-primary)' }}
                                     />
                                     <Legend />
                                 </PieChart>
