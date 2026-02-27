@@ -28,6 +28,14 @@ export function CategoriesPage() {
         color: item.category__color || '#9ca3af'
     })) || [];
 
+    const incomesData = summary?.incomes_by_category?.map((item: any) => ({
+        name: item.category__name || 'General',
+        value: Number(item.total),
+        color: item.category__color || '#9ca3af'
+    })) || [];
+
+    const chartData = activeTab === 'OUT' ? expensesData : incomesData;
+
     return (
         <div className="max-w-6xl mx-auto pb-12">
             <header className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-8">
@@ -48,22 +56,26 @@ export function CategoriesPage() {
 
                 {/* Chart Section */}
                 <div className="lg:col-span-1 bg-[var(--bg-secondary)] p-6 rounded-2xl border border-brand-200 shadow-sm flex flex-col min-h-[400px]">
-                    <h2 className="text-lg font-bold text-[var(--text-primary)] mb-4">Gastos por Categoría</h2>
-                    <p className="text-sm text-[var(--text-secondary)] mb-6">Distribución de tus egresos históricos</p>
+                    <h2 className="text-lg font-bold text-[var(--text-primary)] mb-4">
+                        {activeTab === 'OUT' ? 'Gastos por Categoría' : 'Ingresos por Categoría'}
+                    </h2>
+                    <p className="text-sm text-[var(--text-secondary)] mb-6">
+                        {activeTab === 'OUT' ? 'Distribución de tus egresos históricos' : 'Distribución de tus ingresos históricos'}
+                    </p>
 
                     {loadingSummary ? (
                         <div className="flex-1 flex items-center justify-center text-[var(--text-secondary)]">Cargando gráfico...</div>
-                    ) : expensesData.length === 0 ? (
+                    ) : chartData.length === 0 ? (
                         <div className="flex-1 flex flex-col items-center justify-center text-brand-400">
                             <Tag size={48} className="mb-4 opacity-50" />
-                            <p className="text-sm">No hay suficientes egresos registrados.</p>
+                            <p className="text-sm">No hay suficientes {activeTab === 'OUT' ? 'egresos' : 'ingresos'} registrados.</p>
                         </div>
                     ) : (
                         <div className="flex-1 min-h-[300px]">
                             <ResponsiveContainer width="100%" height="100%">
                                 <PieChart>
                                     <Pie
-                                        data={expensesData}
+                                        data={chartData}
                                         cx="50%"
                                         cy="50%"
                                         innerRadius={60}
@@ -72,7 +84,7 @@ export function CategoriesPage() {
                                         dataKey="value"
                                         stroke="none"
                                     >
-                                        {expensesData.map((entry: any, index: number) => (
+                                        {chartData.map((entry: any, index: number) => (
                                             <Cell
                                                 key={`cell-${index}`}
                                                 fill={entry.color}

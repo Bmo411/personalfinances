@@ -46,6 +46,7 @@ class TransactionViewSet(viewsets.ModelViewSet):
         expenses = queryset.filter(type='OUT', is_transfer=False).aggregate(Sum('amount'))['amount__sum'] or 0
         
         expenses_by_category = queryset.filter(type='OUT', is_transfer=False).values('category__name', 'category__color').annotate(total=Sum('amount')).order_by('-total')
+        incomes_by_category = queryset.filter(type='IN', is_transfer=False).values('category__name', 'category__color').annotate(total=Sum('amount')).order_by('-total')
         
         # Calculate exactly how much money we have physically or in the bank by matching Accounts against Transactions
         accounts = Account.objects.filter(user=self.request.user)
@@ -86,6 +87,7 @@ class TransactionViewSet(viewsets.ModelViewSet):
             'total_income': incomes,
             'total_expense': expenses,
             'expenses_by_category': list(expenses_by_category),
+            'incomes_by_category': list(incomes_by_category),
             'accounts': accounts_data,
             'upcoming_fixed_expenses': upcoming_fixed_expenses
         })
