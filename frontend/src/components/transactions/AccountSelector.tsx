@@ -19,6 +19,11 @@ export function AccountSelector({ value, onChange }: AccountSelectorProps) {
         queryFn: financeService.getAccounts
     });
 
+    const { data: summary } = useQuery({
+        queryKey: ['summary'],
+        queryFn: () => financeService.getSummary()
+    });
+
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
             if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
@@ -33,17 +38,26 @@ export function AccountSelector({ value, onChange }: AccountSelectorProps) {
         mutationFn: financeService.createAccount,
         onSuccess: (newAcc) => {
             queryClient.invalidateQueries({ queryKey: ['accounts'] });
+            queryClient.invalidateQueries({ queryKey: ['summary'] });
             onChange(newAcc.id);
             setSearch('');
             setIsOpen(false);
         }
     });
 
-    const filteredAccounts = accounts.filter(a =>
+    const enrichedAccounts = accounts.map(acc => {
+        const summaryMatch = summary?.accounts?.find((s: any) => s.id === acc.id);
+        return {
+            ...acc,
+            calculated_balance: summaryMatch?.calculated_balance ?? acc.balance
+        };
+    });
+
+    const filteredAccounts = enrichedAccounts.filter(a =>
         a.name.toLowerCase().includes(search.toLowerCase())
     );
     const exactMatch = filteredAccounts.find(a => a.name.toLowerCase() === search.toLowerCase());
-    const selectedAcc = accounts.find(a => a.id === value);
+    const selectedAcc = enrichedAccounts.find(a => a.id === value);
 
     const handleCreate = () => {
         if (!search.trim()) return;
@@ -75,7 +89,7 @@ export function AccountSelector({ value, onChange }: AccountSelectorProps) {
                     />
                 ) : (
                     <span className={selectedAcc ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}>
-                        {selectedAcc ? `${selectedAcc.name} ($${selectedAcc.balance})` : 'Seleccionar cuenta...'}
+                        {selectedAcc ? `${selectedAcc.name} ($${Number(selectedAcc.calculated_balance).toLocaleString('en-US', { minimumFractionDigits: 2 })})` : 'Seleccionar cuenta...'}
                     </span>
                 )}
             </div>
@@ -91,9 +105,12 @@ export function AccountSelector({ value, onChange }: AccountSelectorProps) {
                                     key={acc.id}
                                     type="button"
                                     onClick={() => { onChange(acc.id); setIsOpen(false); setSearch(''); }}
-                                    className="w-full text-left px-4 py-2 hover:bg-[var(--bg-hover)] flex items-center justify-between transition-colors"
+                                    className="w-full text-left px-4 py-3 hover:bg-[var(--bg-hover)] flex items-center justify-between transition-colors border-b border-brand-50 last:border-0"
                                 >
-                                    <span className="text-[var(--text-primary)]">{acc.name} <span className="text-xs text-[var(--text-secondary)] ml-2">{acc.type}</span></span>
+                                    <div>
+                                        <div className="text-[var(--text-primary)] font-medium">{acc.name}</div>
+                                        <div className="text-xs text-[var(--text-secondary)]">{acc.type === 'CASH' ? 'Efectivo' : (acc.type === 'CREDIT' ? 'Crédito' : (acc.type === 'SAVINGS' ? 'Ahorro' : 'Banco'))} • ${Number(acc.calculated_balance).toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
+                                    </div>
                                     {value === acc.id && <Check size={16} className="text-brand-700" />}
                                 </button>
                             ))}
