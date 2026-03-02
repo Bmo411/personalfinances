@@ -161,6 +161,10 @@ export const financeService = {
         const { data } = await api.delete(`finance/recurring/${id}/`);
         return data;
     },
+    updateRecurringExpense: async (id: number, expense: Partial<RecurringExpense>) => {
+        const { data } = await api.patch(`finance/recurring/${id}/`, expense);
+        return data as RecurringExpense;
+    },
     payRecurringExpense: async (id: number, date?: string, account_id?: number) => {
         const { data } = await api.post(`finance/recurring/${id}/pay/`, { date, account_id });
         return data as RecurringExpense;

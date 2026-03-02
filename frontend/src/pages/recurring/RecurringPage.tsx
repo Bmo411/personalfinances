@@ -1,18 +1,28 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { financeService } from '../../services/finance';
-import { PlusCircle, CalendarClock, Loader2, CheckCircle2 } from 'lucide-react';
+import { PlusCircle, CalendarClock, Loader2, CheckCircle2, Pencil, Trash2 } from 'lucide-react';
 import { Modal } from '../../components/ui/Modal';
 import { AccountSelector } from '../../components/transactions/AccountSelector';
 import { CategorySelector } from '../../components/transactions/CategorySelector';
+import { RecurringExpense } from '../../services/finance';
 
 export function RecurringPage() {
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+    const [editingExpense, setEditingExpense] = useState<RecurringExpense | null>(null);
     const queryClient = useQueryClient();
 
     const { data: expenses = [], isLoading } = useQuery({
         queryKey: ['recurring'],
         queryFn: financeService.getRecurringExpenses
+    });
+
+    const deleteMutation = useMutation({
+        mutationFn: financeService.deleteRecurringExpense,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['recurring'] });
+            queryClient.invalidateQueries({ queryKey: ['summary'] });
+        }
     });
 
     const payMutation = useMutation({
@@ -120,19 +130,42 @@ export function RecurringPage() {
                                                 )}
                                             </td>
                                             <td className="px-6 py-4 text-right">
-                                                {!isPaidThisMonth && (
+                                                <div className="flex items-center justify-end gap-2">
+                                                    {!isPaidThisMonth && (
+                                                        <button
+                                                            disabled={payMutation.isPending && payMutation.variables?.id === expense.id}
+                                                            onClick={() => {
+                                                                if (window.confirm(`¿Confirmar cobro de ${expense.name}? Se registrará un egreso de $${expense.amount}.`)) {
+                                                                    payMutation.mutate({ id: expense.id, account_id: expense.account });
+                                                                }
+                                                            }}
+                                                            className="text-sm bg-brand-600 hover:bg-brand-700 text-white py-1.5 px-4 rounded-lg font-medium transition-colors disabled:opacity-50 inline-flex items-center gap-2"
+                                                        >
+                                                            {payMutation.isPending && payMutation.variables?.id === expense.id ? <Loader2 size={16} className="animate-spin" /> : 'Registrar Pago'}
+                                                        </button>
+                                                    )}
+
                                                     <button
-                                                        disabled={payMutation.isPending && payMutation.variables?.id === expense.id}
+                                                        onClick={() => setEditingExpense(expense)}
+                                                        className="p-2 text-[var(--text-secondary)] hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
+                                                        title="Editar"
+                                                    >
+                                                        <Pencil size={18} />
+                                                    </button>
+
+                                                    <button
                                                         onClick={() => {
-                                                            if (window.confirm(`¿Confirmar cobro de ${expense.name}? Se registrará un egreso de $${expense.amount}.`)) {
-                                                                payMutation.mutate({ id: expense.id, account_id: expense.account });
+                                                            if (window.confirm(`¿Estás seguro de eliminar el gasto fijo "${expense.name}"?`)) {
+                                                                deleteMutation.mutate(expense.id);
                                                             }
                                                         }}
-                                                        className="text-sm bg-brand-600 hover:bg-brand-700 text-white py-1.5 px-4 rounded-lg font-medium transition-colors disabled:opacity-50 inline-flex items-center gap-2"
+                                                        disabled={deleteMutation.isPending}
+                                                        className="p-2 text-[var(--text-secondary)] hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                        title="Eliminar"
                                                     >
-                                                        {payMutation.isPending && payMutation.variables?.id === expense.id ? <Loader2 size={16} className="animate-spin" /> : 'Registrar Pago'}
+                                                        {deleteMutation.isPending && deleteMutation.variables === expense.id ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
                                                     </button>
-                                                )}
+                                                </div>
                                             </td>
                                         </tr>
                                     );
@@ -146,21 +179,33 @@ export function RecurringPage() {
             <Modal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} title="Nuevo Gasto Fijo">
                 <RecurringForm onSuccess={() => setIsAddModalOpen(false)} />
             </Modal>
+
+            <Modal isOpen={!!editingExpense} onClose={() => setEditingExpense(null)} title="Editar Gasto Fijo">
+                {editingExpense && (
+                    <RecurringForm
+                        expense={editingExpense}
+                        onSuccess={() => setEditingExpense(null)}
+                    />
+                )}
+            </Modal>
         </div>
     );
 }
 
-function RecurringForm({ onSuccess }: { onSuccess: () => void }) {
-    const [name, setName] = useState('');
-    const [amount, setAmount] = useState('');
-    const [dueDay, setDueDay] = useState('1');
-    const [categoryId, setCategoryId] = useState<number | null>(null);
-    const [accountId, setAccountId] = useState<number | null>(null);
+function RecurringForm({ expense, onSuccess }: { expense?: RecurringExpense, onSuccess: () => void }) {
+    const [name, setName] = useState(expense?.name || '');
+    const [amount, setAmount] = useState(expense?.amount || '');
+    const [dueDay, setDueDay] = useState(expense?.due_day.toString() || '1');
+    const [categoryId, setCategoryId] = useState<number | null>(expense?.category || null);
+    const [accountId, setAccountId] = useState<number | null>(expense?.account || null);
 
     const queryClient = useQueryClient();
 
     const mutation = useMutation({
-        mutationFn: financeService.createRecurringExpense,
+        mutationFn: (data: Partial<RecurringExpense>) =>
+            expense
+                ? financeService.updateRecurringExpense(expense.id, data)
+                : financeService.createRecurringExpense(data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['recurring'] });
             queryClient.invalidateQueries({ queryKey: ['summary'] });
@@ -244,7 +289,7 @@ function RecurringForm({ onSuccess }: { onSuccess: () => void }) {
                     disabled={mutation.isPending || !name || !amount}
                     className="w-full bg-brand-700 hover:bg-brand-900 text-white font-medium py-3 rounded-xl flex justify-center shadow-sm disabled:opacity-50"
                 >
-                    {mutation.isPending ? <Loader2 className="animate-spin" /> : 'Guardar Gasto Fijo'}
+                    {mutation.isPending ? <Loader2 className="animate-spin" /> : expense ? 'Actualizar Gasto Fijo' : 'Guardar Gasto Fijo'}
                 </button>
             </div>
         </form>
