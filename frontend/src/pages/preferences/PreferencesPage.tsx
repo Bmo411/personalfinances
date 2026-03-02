@@ -26,7 +26,7 @@ function InstructionsModal({ onClose }: { onClose: () => void }) {
                                 <p className="font-medium text-[var(--text-primary)]">Agrega el número de CallMeBot</p>
                                 <p className="text-sm mt-1">Guarda este contacto en tu teléfono:</p>
                                 <code className="mt-1 block text-sm bg-[var(--bg-main)] border border-brand-200 px-3 py-2 rounded-lg font-mono text-brand-700">
-                                    +34 644 75 67 89
+                                    +34 644 66 32 62
                                 </code>
                             </div>
                         </li>
@@ -115,26 +115,33 @@ export function PreferencesPage() {
     };
 
     const handleTest = async () => {
-        // Save first, then send test
-        await financeService.updateUserProfile({
-            whatsapp_phone: localPhone || null,
-            whatsapp_apikey: localApiKey || null,
-            whatsapp_enabled: localEnabled,
-        });
+        // Save settings first
+        try {
+            await financeService.updateUserProfile({
+                whatsapp_phone: localPhone || null,
+                whatsapp_apikey: localApiKey || null,
+                whatsapp_enabled: localEnabled,
+            });
+        } catch {
+            // Ignore save errors - proceed with test using local values
+        }
+
         setTestStatus('sending');
         setTestMessage('');
+
+        // Call CallMeBot directly from the browser — no server relay needed
         try {
-            const res = await financeService.sendWhatsAppTest();
-            if (res.error) {
-                setTestStatus('error');
-                setTestMessage(res.error);
-            } else {
-                setTestStatus('ok');
-                setTestMessage(res.message || 'Mensaje enviado correctamente.');
-            }
+            const message = encodeURIComponent('✅ Conexión exitosa con tu app de finanzas. Las notificaciones de gastos fijos están activas.');
+            const phone = localPhone.replace(/[^0-9]/g, ''); // strip all non-digits
+            const url = `https://api.callmebot.com/whatsapp.php?phone=${phone}&text=${message}&apikey=${localApiKey.trim()}`;
+
+            await fetch(url, { mode: 'no-cors' });
+            // no-cors always returns opaque response; if we get here, the request was sent
+            setTestStatus('ok');
+            setTestMessage('Solicitud enviada a CallMeBot. Deberías recibir el WhatsApp en unos segundos.');
         } catch (e: any) {
             setTestStatus('error');
-            setTestMessage(e?.response?.data?.error || 'Error al conectar con el servidor.');
+            setTestMessage('No se pudo enviar la solicitud. Verifica tu conexión a internet.');
         }
     };
 
