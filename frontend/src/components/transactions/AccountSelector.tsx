@@ -95,7 +95,7 @@ export function AccountSelector({ value, onChange }: AccountSelectorProps) {
             </div>
 
             {isOpen && (
-                <div className="absolute z-10 w-full mt-2 bg-[var(--bg-secondary)] border border-brand-200 rounded-xl shadow-lg max-h-60 overflow-auto">
+                <div className="absolute z-[200] w-full mt-2 bg-[var(--bg-secondary)] border border-brand-200 rounded-xl shadow-lg max-h-60 overflow-auto">
                     {isLoading ? (
                         <div className="p-4 text-center text-brand-500"><Loader2 className="animate-spin mx-auto" /></div>
                     ) : (
