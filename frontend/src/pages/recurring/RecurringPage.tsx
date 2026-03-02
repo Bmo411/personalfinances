@@ -279,7 +279,7 @@ function RecurringForm({ expense, onSuccess }: { expense?: RecurringExpense, onS
                 </div>
             </div>
 
-            <div className="z-50 relative pb-2">
+            <div className="z-[70] relative pb-2">
                 <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">Categoría (Opcional)</label>
                 <CategorySelector
                     type="OUT"
@@ -288,7 +288,7 @@ function RecurringForm({ expense, onSuccess }: { expense?: RecurringExpense, onS
                 />
             </div>
 
-            <div className="z-40 relative pb-2 pt-2">
+            <div className="z-[60] relative pb-2 pt-2">
                 <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">Cuenta automática (Opcional)</label>
                 <AccountSelector
                     value={accountId}
