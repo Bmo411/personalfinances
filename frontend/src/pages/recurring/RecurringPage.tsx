@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { financeService } from '../../services/finance';
-import { PlusCircle, CalendarClock, Loader2, CheckCircle2, Pencil, Trash2 } from 'lucide-react';
+import { PlusCircle, CalendarClock, Loader2, CheckCircle2, Pencil, Trash2, BellRing } from 'lucide-react';
 import { Modal } from '../../components/ui/Modal';
 import { AccountSelector } from '../../components/transactions/AccountSelector';
 import { CategorySelector } from '../../components/transactions/CategorySelector';
 import { RecurringExpense } from '../../services/finance';
+import { Link } from 'react-router-dom';
 
 export function RecurringPage() {
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -57,6 +58,18 @@ export function RecurringPage() {
                     Agregar
                 </button>
             </header>
+
+            {/* WhatsApp notifications tip banner */}
+            <div className="mb-6 flex items-start gap-3 bg-green-50 border border-green-200 rounded-xl px-5 py-4 text-green-800">
+                <BellRing size={20} className="mt-0.5 shrink-0 text-green-600" />
+                <div className="text-sm">
+                    <span className="font-semibold">¿Sabías que puedes recibir recordatorios por WhatsApp?</span>
+                    {' '}El sistema te avisará automáticamente <strong>7 días</strong> y <strong>3 días</strong> antes de cada cobro.{' '}
+                    <Link to="/preferences" className="underline font-semibold hover:text-green-900 transition-colors">
+                        Actívalo en Preferencias →
+                    </Link>
+                </div>
+            </div>
 
             {isLoading ? (
                 <div className="flex justify-center py-20 text-[var(--text-secondary)]">Cargando pagos fijos...</div>
