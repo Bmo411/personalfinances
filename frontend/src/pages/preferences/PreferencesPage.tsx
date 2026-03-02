@@ -129,22 +129,20 @@ export function PreferencesPage() {
         setTestStatus('sending');
         setTestMessage('');
 
-        // Call backend with phone+apikey in body (HTTPS-encrypted, not in URL)
+        // Llamar a CallMeBot directo desde el navegador
         try {
-            const res = await financeService.sendWhatsAppTest(
-                localPhone.trim().replace(/\+/g, ''),
-                localApiKey.trim()
+            const phone = localPhone.trim().replace(/\+/g, '');
+            const message = encodeURIComponent('✅ Conexión exitosa con tu app de finanzas. Las notificaciones de gastos fijos están activas.');
+            await fetch(
+                `https://api.callmebot.com/whatsapp.php?phone=${phone}&text=${message}&apikey=${localApiKey.trim()}`,
+                { mode: 'no-cors' }
             );
-            if (res.error) {
-                setTestStatus('error');
-                setTestMessage(res.error);
-            } else {
-                setTestStatus('ok');
-                setTestMessage(res.message || 'Mensaje enviado correctamente.');
-            }
+            // Con no-cors no podemos leer la respuesta, pero si llegó aquí el request se envió
+            setTestStatus('ok');
+            setTestMessage('Solicitud enviada. Deberías recibir el WhatsApp en unos segundos. ✅');
         } catch (e: any) {
             setTestStatus('error');
-            setTestMessage(e?.response?.data?.error || 'Error al conectar con el servidor.');
+            setTestMessage('No se pudo enviar. Verifica tu conexión a internet.');
         }
     };
 
