@@ -51,6 +51,15 @@ export interface Account {
     calculated_balance?: number; // Added from backend summary
 }
 
+export interface UserProfile {
+    id: number;
+    username: string;
+    email: string;
+    whatsapp_phone: string | null;
+    whatsapp_apikey: string | null;
+    whatsapp_enabled: boolean;
+}
+
 export interface RecurringExpense {
     id: number;
     name: string;
@@ -168,5 +177,19 @@ export const financeService = {
     payRecurringExpense: async (id: number, date?: string, account_id?: number) => {
         const { data } = await api.post(`finance/recurring/${id}/pay/`, { date, account_id });
         return data as RecurringExpense;
-    }
+    },
+
+    // User Profile / WhatsApp Settings
+    getUserProfile: async () => {
+        const { data } = await api.get('users/profile/');
+        return data as UserProfile;
+    },
+    updateUserProfile: async (profile: Partial<UserProfile>) => {
+        const { data } = await api.patch('users/profile/', profile);
+        return data as UserProfile;
+    },
+    sendWhatsAppTest: async () => {
+        const { data } = await api.post('users/whatsapp-test/');
+        return data as { message?: string; error?: string };
+    },
 };
