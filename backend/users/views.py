@@ -1,5 +1,4 @@
-import urllib.parse
-import urllib.request
+import requests as http_requests
 from rest_framework import generics
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -40,15 +39,23 @@ class WhatsAppTestView(APIView):
             return Response({'error': 'Configura tu número y API key primero.'}, status=400)
 
         message = '✅ Conexión exitosa con tu app de finanzas. Las notificaciones de gastos fijos están activas.'
-        encoded_message = urllib.parse.quote(message)
-        url = f'https://api.callmebot.com/whatsapp.php?phone={phone}&text={encoded_message}&apikey={apikey}'
-
+        
         try:
-            with urllib.request.urlopen(url, timeout=10) as response:
-                body = response.read().decode()
-                if response.status == 200:
-                    return Response({'message': 'Mensaje enviado correctamente.'})
-                else:
-                    return Response({'error': f'Error de CallMeBot: {body}'}, status=502)
-        except Exception as e:
+            resp = http_requests.get(
+                'https://api.callmebot.com/whatsapp.php',
+                params={
+                    'phone': phone.strip().replace('+', ''),
+                    'text': message,
+                    'apikey': apikey.strip(),
+                },
+                timeout=15
+            )
+            # CallMeBot returns 200 with "Message queued." on success
+            if resp.status_code == 200:
+                return Response({'message': 'Mensaje enviado correctamente. Deberías recibirlo en unos segundos.'})
+            else:
+                return Response({'error': f'CallMeBot respondió con error {resp.status_code}: {resp.text[:200]}'}, status=502)
+        except http_requests.exceptions.Timeout:
+            return Response({'error': 'Tiempo de espera agotado al contactar CallMeBot.'}, status=504)
+        except http_requests.exceptions.RequestException as e:
             return Response({'error': f'No se pudo conectar con CallMeBot: {str(e)}'}, status=502)
