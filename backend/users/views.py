@@ -31,9 +31,9 @@ class WhatsAppTestView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        user = request.user
-        phone = user.whatsapp_phone
-        apikey = user.whatsapp_apikey
+        # Read from request body (frontend sends them directly - safer than URL params)
+        phone = request.data.get('phone') or getattr(request.user, 'whatsapp_phone', None)
+        apikey = request.data.get('apikey') or getattr(request.user, 'whatsapp_apikey', None)
 
         if not phone or not apikey:
             return Response({'error': 'Configura tu número y API key primero.'}, status=400)
@@ -44,13 +44,12 @@ class WhatsAppTestView(APIView):
             resp = http_requests.get(
                 'https://api.callmebot.com/whatsapp.php',
                 params={
-                    'phone': phone.strip().replace('+', ''),
+                    'phone': str(phone).strip().replace('+', ''),
                     'text': message,
-                    'apikey': apikey.strip(),
+                    'apikey': str(apikey).strip(),
                 },
                 timeout=15
             )
-            # CallMeBot returns 200 with "Message queued." on success
             if resp.status_code == 200:
                 return Response({'message': 'Mensaje enviado correctamente. Deberías recibirlo en unos segundos.'})
             else:

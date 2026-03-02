@@ -188,8 +188,8 @@ export const financeService = {
         const { data } = await api.patch('users/profile/', profile);
         return data as UserProfile;
     },
-    sendWhatsAppTest: async () => {
-        const { data } = await api.post('users/whatsapp-test/');
+    sendWhatsAppTest: async (phone: string, apikey: string) => {
+        const { data } = await api.post('users/whatsapp-test/', { phone, apikey });
         return data as { message?: string; error?: string };
     },
 };

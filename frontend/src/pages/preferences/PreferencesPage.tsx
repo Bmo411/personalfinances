@@ -129,9 +129,12 @@ export function PreferencesPage() {
         setTestStatus('sending');
         setTestMessage('');
 
-        // Call backend — keeps phone + apikey off the browser network tab
+        // Call backend with phone+apikey in body (HTTPS-encrypted, not in URL)
         try {
-            const res = await financeService.sendWhatsAppTest();
+            const res = await financeService.sendWhatsAppTest(
+                localPhone.trim().replace(/\+/g, ''),
+                localApiKey.trim()
+            );
             if (res.error) {
                 setTestStatus('error');
                 setTestMessage(res.error);
