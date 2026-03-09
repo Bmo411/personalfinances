@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { PlusCircle, TrendingDown, TrendingUp, Wallet2, CalendarClock, BarChart3 } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { PlusCircle, TrendingDown, TrendingUp, Wallet2, CalendarClock, BarChart3, Activity } from 'lucide-react';
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid } from 'recharts';
 import { useQuery } from '@tanstack/react-query';
 import { financeService } from '../../services/finance';
 import { Modal } from '../../components/ui/Modal';
@@ -19,6 +19,7 @@ export function Dashboard() {
     const totalExpense = Number(summary?.total_expense || 0);
     const accounts = summary?.accounts || [];
     const upcomingFixed = Number(summary?.upcoming_fixed_expenses || 0);
+    const last7DaysExpenses = summary?.last_7_days_expenses || [];
 
     const calculatedTotalNetworth = accounts.reduce((sum: number, acc: any) => {
         // Credit cards are negative balances for networth
@@ -30,6 +31,12 @@ export function Dashboard() {
         { name: 'Ingresos', value: totalIncome, color: '#16a34a' }, // brand-600 approx or green
         { name: 'Egresos', value: totalExpense, color: '#ef4444' }   // red-500 approx
     ];
+
+    // Formatting dates for the 7-day chart
+    const formatDate = (dateString: string) => {
+        const [, month, day] = dateString.split('-');
+        return `${day}/${month}`;
+    };
 
     return (
         <div className="max-w-6xl mx-auto">
@@ -85,14 +92,56 @@ export function Dashboard() {
                         </p>
                     </div>
 
-                    {/* Chart Section */}
-                    <div className="bg-[var(--bg-secondary)] rounded-2xl p-6 shadow-sm border border-brand-200 md:col-span-3">
+                    {/* Weekly Expenses Chart */}
+                    <div className="bg-[var(--bg-secondary)] rounded-2xl p-6 shadow-sm border border-brand-200 md:col-span-2">
                         <h2 className="text-[var(--text-secondary)] font-medium mb-6 flex items-center gap-2">
-                            <BarChart3 size={18} className="text-brand-600" /> Comparativa General
+                            <Activity size={18} className="text-red-500" /> Gastos de los últimos 7 días
                         </h2>
                         <div className="h-64 md:h-80 w-full">
                             <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={chartData} margin={{ top: 20, right: 20, left: 0, bottom: 0 }}>
+                                <LineChart data={last7DaysExpenses} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--brand-200)" />
+                                    <XAxis
+                                        dataKey="date"
+                                        tickFormatter={formatDate}
+                                        tick={{ fill: 'var(--text-secondary)', fontSize: 12 }}
+                                        axisLine={false}
+                                        tickLine={false}
+                                        dy={10}
+                                    />
+                                    <YAxis
+                                        tickFormatter={(value) => `$${value}`}
+                                        tick={{ fill: 'var(--text-secondary)', fontSize: 12 }}
+                                        axisLine={false}
+                                        tickLine={false}
+                                    />
+                                    <Tooltip
+                                        cursor={{ stroke: 'var(--brand-200)', strokeWidth: 2, strokeDasharray: '4 4' }}
+                                        contentStyle={{ borderRadius: '12px', border: '1px solid var(--brand-200)', backgroundColor: 'var(--bg-main)', color: 'var(--text-primary)' }}
+                                        labelFormatter={(label) => `Fecha: ${label}`}
+                                        formatter={(value: any) => [`$${Number(value).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, 'Gasto']}
+                                    />
+                                    <Line
+                                        type="monotone"
+                                        dataKey="total"
+                                        stroke="#ef4444"
+                                        strokeWidth={3}
+                                        dot={{ r: 4, fill: '#ef4444', strokeWidth: 0 }}
+                                        activeDot={{ r: 6, strokeWidth: 0 }}
+                                    />
+                                </LineChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+
+                    {/* General Comparativa Chart */}
+                    <div className="bg-[var(--bg-secondary)] rounded-2xl p-6 shadow-sm border border-brand-200 md:col-span-1">
+                        <h2 className="text-[var(--text-secondary)] font-medium mb-6 flex items-center gap-2">
+                            <BarChart3 size={18} className="text-brand-600" /> Comparativa Mes
+                        </h2>
+                        <div className="h-64 md:h-80 w-full">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                                     <XAxis dataKey="name" tick={{ fill: 'var(--text-secondary)' }} axisLine={false} tickLine={false} />
                                     <YAxis tickFormatter={(value) => `$${value}`} tick={{ fill: 'var(--text-secondary)' }} axisLine={false} tickLine={false} />
                                     <Tooltip

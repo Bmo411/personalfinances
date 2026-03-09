@@ -82,6 +82,23 @@ class TransactionViewSet(viewsets.ModelViewSet):
             # If not paid, consider it upcoming or past due
             upcoming_fixed_expenses += expense.amount
             
+        # Last 7 days expenses
+        last_7_days_expenses = []
+        for i in range(6, -1, -1):
+            day = today - datetime.timedelta(days=i)
+            day_expenses = Transaction.objects.filter(
+                user=self.request.user, 
+                is_deleted=False, 
+                type='OUT', 
+                is_transfer=False,
+                date=day
+            ).aggregate(Sum('amount'))['amount__sum'] or 0
+            
+            last_7_days_expenses.append({
+                'date': day.strftime('%Y-%m-%d'),
+                'total': day_expenses
+            })
+            
         return Response({
             'balance': incomes - expenses,
             'total_income': incomes,
@@ -89,7 +106,8 @@ class TransactionViewSet(viewsets.ModelViewSet):
             'expenses_by_category': list(expenses_by_category),
             'incomes_by_category': list(incomes_by_category),
             'accounts': accounts_data,
-            'upcoming_fixed_expenses': upcoming_fixed_expenses
+            'upcoming_fixed_expenses': upcoming_fixed_expenses,
+            'last_7_days_expenses': last_7_days_expenses
         })
 
     @action(detail=False, methods=['post'])
@@ -247,6 +265,59 @@ class DebtViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+        
+    @action(detail=True, methods=['post'])
+    def pay(self, request, pk=None):
+        debt = self.get_object()
+        amount = request.data.get('amount')
+        account_id = request.data.get('account_id')
+        
+        if not amount or not account_id:
+            return Response({'error': 'amount and account_id are required'}, status=400)
+            
+        try:
+            amount = float(amount)
+            if amount <= 0:
+                return Response({'error': 'Amount must be positive'}, status=400)
+        except ValueError:
+            return Response({'error': 'Invalid amount'}, status=400)
+            
+        if amount > float(debt.remaining_amount):
+            return Response({'error': 'Amount exceeds remaining debt'}, status=400)
+            
+        account = Account.objects.filter(id=account_id, user=request.user).first()
+        if not account:
+            return Response({'error': 'Account not found'}, status=404)
+            
+        # Update debt
+        new_remaining = float(debt.remaining_amount) - amount
+        debt.remaining_amount = new_remaining
+        if new_remaining <= 0:
+            debt.is_settled = True
+        debt.save()
+        
+        # Create transaction
+        # If I owe money and I pay it, it's an expense (OUT) from my account
+        # If someone owes me money and pays me, it's an income (IN) to my account
+        tx_type = 'OUT' if debt.type == 'I_OWE' else 'IN'
+        desc = f"Payment for debt/loan: {debt.name}"
+        
+        Transaction.objects.create(
+            user=request.user,
+            account=account,
+            type=tx_type,
+            amount=amount,
+            date=datetime.date.today(),
+            description=desc,
+            payment_method='TRANSFER', # Defaulting to TRANSFER, or we could pass it from frontend
+            category=None
+        )
+        
+        # We don't update account.balance directly if it's dynamically calculated in summary, 
+        # but in the model account.balance might be a base balance. 
+        # According to summary it uses `Account.balance + incomes - expenses`.
+        
+        return Response(DebtSerializer(debt).data)
 
 class AccountViewSet(viewsets.ModelViewSet):
     serializer_class = AccountSerializer

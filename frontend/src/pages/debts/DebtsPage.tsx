@@ -236,29 +236,37 @@ function CreateDebtForm({ onSuccess }: { onSuccess: () => void }) {
 
 function PaymentForm({ debt, onSuccess }: { debt: any, onSuccess: () => void }) {
     const [amount, setAmount] = useState('');
+    const [accountId, setAccountId] = useState<number | ''>('');
     const queryClient = useQueryClient();
     const remaining = Number(debt.remaining_amount);
 
-    // Simplification for prototype: normally we'd hit a dedicated endpoint, 
-    // but here we just PUT the updated remaining_amount to the debt.
+    const { data: accounts = [] } = useQuery({
+        queryKey: ['accounts'],
+        queryFn: financeService.getAccounts
+    });
+
     const mutation = useMutation({
-        mutationFn: ({ id, payload }: { id: number, payload: any }) => financeService.updateDebt(id, payload),
+        mutationFn: ({ id, payload }: { id: number, payload: { amount: string, account_id: number } }) => financeService.payDebt(id, payload),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['debts'] });
+            queryClient.invalidateQueries({ queryKey: ['summary'] });
+            queryClient.invalidateQueries({ queryKey: ['transactions'] });
             onSuccess();
         }
     });
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        const payAmount = Number(amount);
-        const newRemaining = remaining - payAmount;
+        if (!accountId) {
+            alert('Por favor selecciona una cuenta');
+            return;
+        }
 
         mutation.mutate({
             id: debt.id,
             payload: {
-                remaining_amount: newRemaining.toString(),
-                is_settled: newRemaining <= 0
+                amount: amount,
+                account_id: Number(accountId)
             }
         });
     };
@@ -268,6 +276,21 @@ function PaymentForm({ debt, onSuccess }: { debt: any, onSuccess: () => void }) 
             <div className="bg-brand-50 p-4 rounded-xl text-center mb-4 border border-brand-200">
                 <p className="text-sm text-brand-700">Restante a pagar de {debt.name}</p>
                 <p className="text-2xl font-bold text-brand-900">${remaining.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+            </div>
+
+            <div>
+                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">Cuenta asociada</label>
+                <select
+                    value={accountId}
+                    onChange={e => setAccountId(e.target.value ? Number(e.target.value) : '')}
+                    className="w-full px-4 py-3 rounded-xl border border-brand-200 bg-[var(--bg-main)] text-[var(--text-primary)] mb-4"
+                    required
+                >
+                    <option value="">Selecciona una cuenta</option>
+                    {accounts.filter(a => a.is_active).map(acc => (
+                        <option key={acc.id} value={acc.id}>{acc.name} (${Number(acc.balance).toLocaleString()})</option>
+                    ))}
+                </select>
             </div>
 
             <div>
@@ -286,7 +309,7 @@ function PaymentForm({ debt, onSuccess }: { debt: any, onSuccess: () => void }) 
             </div>
             <button
                 type="submit"
-                disabled={mutation.isPending || Number(amount) > remaining}
+                disabled={mutation.isPending || Number(amount) > remaining || !accountId}
                 className="w-full mt-4 bg-brand-700 hover:bg-brand-900 text-white font-medium py-3 rounded-xl flex justify-center disabled:opacity-50"
             >
                 {mutation.isPending ? <Loader2 className="animate-spin" /> : 'Confirmar'}

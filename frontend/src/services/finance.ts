@@ -138,6 +138,10 @@ export const financeService = {
         const { data } = await api.patch(`finance/debts/${id}/`, debt);
         return data as Debt;
     },
+    payDebt: async (id: number, payload: { amount: string, account_id: number }) => {
+        const { data } = await api.post(`finance/debts/${id}/pay/`, payload);
+        return data as Debt;
+    },
     deleteDebt: async (id: number) => {
         const { data } = await api.delete(`finance/debts/${id}/`);
         return data;
