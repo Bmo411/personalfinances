@@ -58,8 +58,8 @@ export function Dashboard() {
             {isLoading ? (
                 <div className="h-40 flex items-center justify-center text-[var(--text-secondary)]">Cargando datos...</div>
             ) : (
-                <main className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="bg-[var(--bg-secondary)] rounded-2xl p-6 shadow-sm border border-brand-200 lg:col-span-2 relative overflow-hidden group">
+                <main className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div className="bg-[var(--bg-secondary)] rounded-2xl p-6 shadow-sm border border-brand-200 md:col-span-2 lg:col-span-2 relative overflow-hidden group">
                         <div className="flex items-center gap-3 mb-2 relative z-10">
                             <div className="p-2 bg-brand-50 rounded-xl text-brand-700">
                                 <Wallet2 size={24} />
@@ -93,7 +93,7 @@ export function Dashboard() {
                     </div>
 
                     {/* Weekly Expenses Chart */}
-                    <div className="bg-[var(--bg-secondary)] rounded-2xl p-6 shadow-sm border border-brand-200 md:col-span-2">
+                    <div className="bg-[var(--bg-secondary)] rounded-2xl p-6 shadow-sm border border-brand-200 md:col-span-2 lg:col-span-3">
                         <h2 className="text-[var(--text-secondary)] font-medium mb-6 flex items-center gap-2">
                             <Activity size={18} className="text-red-500" /> Gastos de los últimos 7 días
                         </h2>
@@ -135,7 +135,7 @@ export function Dashboard() {
                     </div>
 
                     {/* General Comparativa Chart */}
-                    <div className="bg-[var(--bg-secondary)] rounded-2xl p-6 shadow-sm border border-brand-200 md:col-span-1">
+                    <div className="bg-[var(--bg-secondary)] rounded-2xl p-6 shadow-sm border border-brand-200 md:col-span-2 lg:col-span-1">
                         <h2 className="text-[var(--text-secondary)] font-medium mb-6 flex items-center gap-2">
                             <BarChart3 size={18} className="text-brand-600" /> Comparativa Mes
                         </h2>
