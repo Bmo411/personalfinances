@@ -86,17 +86,24 @@ class TransactionViewSet(viewsets.ModelViewSet):
         last_7_days_expenses = []
         for i in range(6, -1, -1):
             day = today - datetime.timedelta(days=i)
-            day_expenses = Transaction.objects.filter(
+            
+            day_txs = Transaction.objects.filter(
                 user=self.request.user, 
                 is_deleted=False, 
                 type='OUT', 
                 is_transfer=False,
                 date=day
-            ).aggregate(Sum('amount'))['amount__sum'] or 0
+            )
+            
+            day_total = day_txs.aggregate(Sum('amount'))['amount__sum'] or 0
+            
+            # Fetch breakdown by category
+            day_categories = day_txs.values('category__name', 'category__color').annotate(total=Sum('amount')).order_by('-total')
             
             last_7_days_expenses.append({
                 'date': day.strftime('%Y-%m-%d'),
-                'total': day_expenses
+                'total': day_total,
+                'categories': list(day_categories)
             })
             
         return Response({
