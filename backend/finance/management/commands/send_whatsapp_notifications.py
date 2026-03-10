@@ -62,10 +62,10 @@ class Command(BaseCommand):
             days_text = f'en {days_until} días'
 
         message = (
-            f'⚠️ Recordatorio de pago\n'
-            f'*{expense.name}* se cobra {days_text} '
+            f'*⚠️ Recordatorio de pago*\n'
+            f'_{expense.name}_ se cobra {days_text} '
             f'(día {expense.due_day}) por ${float(expense.amount):,.2f}.\n'
-            f'Entra a tu app de finanzas para registrarlo. 💸'
+            f'Entra a tu app de finanzas para registrarlo.'
         )
 
         try:
