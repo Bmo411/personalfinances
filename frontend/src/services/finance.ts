@@ -160,6 +160,13 @@ export const financeService = {
         const { data } = await api.put(`finance/accounts/${id}/`, account);
         return data as Account;
     },
+    reconcileAccount: async (id: number, actualBalance: number, notes: string) => {
+        const { data } = await api.post(`finance/accounts/${id}/reconcile/`, {
+            actual_balance: actualBalance,
+            notes
+        });
+        return data;
+    },
 
     // Gastos Fijos (Recurring)
     getRecurringExpenses: async () => {

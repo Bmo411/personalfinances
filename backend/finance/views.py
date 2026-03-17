@@ -336,6 +336,57 @@ class AccountViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
+    @action(detail=True, methods=['post'])
+    def reconcile(self, request, pk=None):
+        account = self.get_object()
+        actual_balance = request.data.get('actual_balance')
+        notes = request.data.get('notes', '')
+
+        if actual_balance is None:
+            return Response({'error': 'actual_balance is required'}, status=400)
+
+        try:
+            actual_balance = float(actual_balance)
+        except ValueError:
+            return Response({'error': 'Invalid actual_balance'}, status=400)
+
+        # Calculate current balance (same logic as summary)
+        account_txs = Transaction.objects.filter(user=self.request.user, is_deleted=False, account=account)
+        acc_incomes = account_txs.filter(type='IN').aggregate(Sum('amount'))['amount__sum'] or 0
+        acc_expenses = account_txs.filter(type='OUT').aggregate(Sum('amount'))['amount__sum'] or 0
+        
+        current_calculated_balance = float(account.balance) + float(acc_incomes) - float(acc_expenses)
+        diff = actual_balance - current_calculated_balance
+
+        if diff == 0:
+            return Response({'message': 'Balance is already correct', 'balance': actual_balance})
+
+        tx_type = 'IN' if diff > 0 else 'OUT'
+        abs_diff = abs(diff)
+
+        description = "Ajuste de saldo"
+        if notes:
+            description += f": {notes}"
+
+        Transaction.objects.create(
+            user=self.request.user,
+            account=account,
+            type=tx_type,
+            amount=abs_diff,
+            date=datetime.date.today(),
+            description=description,
+            payment_method='TRANSFER', # Using TRANSFER as it's an internal adjustment
+            is_transfer=True # Mark as transfer to avoid inflating gross income/expenses
+        )
+
+        return Response({
+            'message': 'Adjustment created successfully',
+            'previous_balance': current_calculated_balance,
+            'new_balance': actual_balance,
+            'adjustment_amount': abs_diff,
+            'type': tx_type
+        })
+
 class RecurringExpenseViewSet(viewsets.ModelViewSet):
     serializer_class = RecurringExpenseSerializer
     permission_classes = [IsAuthenticated]

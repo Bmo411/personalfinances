@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { financeService } from '../../services/finance';
-import { PlusCircle, Wallet, Loader2, CreditCard, Landmark, Target } from 'lucide-react';
+import { PlusCircle, Wallet, Loader2, CreditCard, Landmark, Target, CheckCircle2 } from 'lucide-react';
 import { Modal } from '../../components/ui/Modal';
 
 export function AccountsPage() {
     const [isAddAccountModalOpen, setIsAddAccountModalOpen] = useState(false);
+    const [reconcilingAccount, setReconcilingAccount] = useState<any>(null);
 
     const { data: accounts = [], isLoading } = useQuery({
         queryKey: ['accounts'],
@@ -127,6 +128,15 @@ export function AccountsPage() {
                                             ${Number(account.calculated_balance).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                                         </p>
                                     </div>
+
+                                    <button
+                                        onClick={() => setReconcilingAccount(account)}
+                                        className="text-xs bg-brand-50 hover:bg-brand-100 text-brand-700 font-medium py-2 px-3 rounded-lg transition-colors flex items-center gap-1.5"
+                                        title="Sincronizar saldo real"
+                                    >
+                                        <CheckCircle2 size={14} />
+                                        Ajustar Saldo
+                                    </button>
                                 </div>
                             </div>
                         )
@@ -137,7 +147,110 @@ export function AccountsPage() {
             <Modal isOpen={isAddAccountModalOpen} onClose={() => setIsAddAccountModalOpen(false)} title="Agregar Cuenta / Billetera">
                 <CreateAccountForm onSuccess={() => setIsAddAccountModalOpen(false)} />
             </Modal>
+
+            <Modal
+                isOpen={!!reconcilingAccount}
+                onClose={() => setReconcilingAccount(null)}
+                title={`Ajustar Saldo: ${reconcilingAccount?.name}`}
+            >
+                {reconcilingAccount && (
+                    <ReconcileAccountForm
+                        account={reconcilingAccount}
+                        onSuccess={() => setReconcilingAccount(null)}
+                    />
+                )}
+            </Modal>
         </div>
+    );
+}
+
+function ReconcileAccountForm({ account, onSuccess }: { account: any, onSuccess: () => void }) {
+    const [actualBalance, setActualBalance] = useState(account.calculated_balance?.toString() || '');
+    const [notes, setNotes] = useState('');
+
+    const queryClient = useQueryClient();
+
+    const mutation = useMutation({
+        mutationFn: ({ id, balance, notes }: { id: number, balance: number, notes: string }) =>
+            financeService.reconcileAccount(id, balance, notes),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['accounts'] });
+            queryClient.invalidateQueries({ queryKey: ['summary'] });
+            queryClient.invalidateQueries({ queryKey: ['transactions'] });
+            onSuccess();
+        },
+        onError: (error: any) => {
+            console.error("Error reconciling account:", error);
+            alert("No se pudo ajustar el saldo.");
+        }
+    });
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        const balance = parseFloat(actualBalance);
+        if (isNaN(balance)) return;
+        mutation.mutate({ id: account.id, balance, notes });
+    };
+
+    return (
+        <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                    ¿Cuánto dinero tienes realmente en ésta cuenta?
+                </label>
+                <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]">$</span>
+                    <input
+                        type="number"
+                        step="0.01"
+                        value={actualBalance}
+                        onChange={e => setActualBalance(e.target.value)}
+                        className="w-full pl-8 pr-4 py-3 rounded-xl border border-brand-200 bg-[var(--bg-main)] text-[var(--text-primary)] text-xl font-bold"
+                        placeholder="0.00"
+                        required
+                        autoFocus
+                    />
+                </div>
+                <p className="text-xs text-[var(--text-secondary)] mt-2">
+                    Se creará un movimiento de ajuste automático para igualar este monto.
+                </p>
+            </div>
+
+            <div>
+                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                    Notas / Recordatorio (Opcional)
+                </label>
+                <textarea
+                    value={notes}
+                    onChange={e => setNotes(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border border-brand-200 bg-[var(--bg-main)] text-[var(--text-primary)]"
+                    placeholder="¿Por qué hay una diferencia? (ej: olvidé anotar un café, propinas, error de cálculo...)"
+                    rows={3}
+                />
+            </div>
+
+            <div className="flex gap-3 pt-2">
+                <button
+                    type="button"
+                    onClick={onSuccess}
+                    className="flex-1 px-4 py-3 rounded-xl border border-brand-200 text-[var(--text-primary)] font-medium hover:bg-brand-50 transition-colors"
+                >
+                    Cancelar
+                </button>
+                <button
+                    type="submit"
+                    disabled={mutation.isPending}
+                    className="flex-[2] bg-brand-700 hover:bg-brand-900 text-white font-medium py-3 rounded-xl flex justify-center items-center gap-2"
+                >
+                    {mutation.isPending ? <Loader2 className="animate-spin" /> : (
+                        <>
+                            <CheckCircle2 size={18} />
+                            Confirmar Ajuste
+                        </>
+                    )}
+                </button>
+            </div>
+        </form>
     );
 }
 
