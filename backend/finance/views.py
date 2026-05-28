@@ -5,6 +5,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db.models import Sum
+from django.db.models.functions import TruncMonth
+from django.utils.dateparse import parse_date
 from .models import Category, Transaction, SavingsGoal, Debt, Account, RecurringExpense
 from .serializers import CategorySerializer, TransactionSerializer, SavingsGoalSerializer, DebtSerializer, AccountSerializer, RecurringExpenseSerializer
 
@@ -26,8 +28,17 @@ class TransactionViewSet(viewsets.ModelViewSet):
         queryset = Transaction.objects.filter(user=self.request.user, is_deleted=False)
         month = self.request.query_params.get('month', None)
         year = self.request.query_params.get('year', None)
-        if month and year:
-            queryset = queryset.filter(date__year=year, date__month=month)
+        date_from = parse_date(self.request.query_params.get('date_from', '') or '')
+        date_to = parse_date(self.request.query_params.get('date_to', '') or '')
+        month_year = self._parse_month_year(month, year)
+
+        if date_from:
+            queryset = queryset.filter(date__gte=date_from)
+        if date_to:
+            queryset = queryset.filter(date__lte=date_to)
+        if not date_from and not date_to and month_year:
+            month_int, year_int = month_year
+            queryset = queryset.filter(date__year=year_int, date__month=month_int)
         return queryset.order_by('-date', '-created_at')
 
     def perform_create(self, serializer):
@@ -44,6 +55,7 @@ class TransactionViewSet(viewsets.ModelViewSet):
         # Omit transfers from net income/expense calculations
         incomes = queryset.filter(type='IN', is_transfer=False).aggregate(Sum('amount'))['amount__sum'] or 0
         expenses = queryset.filter(type='OUT', is_transfer=False).aggregate(Sum('amount'))['amount__sum'] or 0
+        credit_card_expense = queryset.filter(type='OUT', is_transfer=False, account__type='CREDIT').aggregate(Sum('amount'))['amount__sum'] or 0
         
         expenses_by_category = queryset.filter(type='OUT', is_transfer=False).values('category__name', 'category__color').annotate(total=Sum('amount')).order_by('-total')
         incomes_by_category = queryset.filter(type='IN', is_transfer=False).values('category__name', 'category__color').annotate(total=Sum('amount')).order_by('-total')
@@ -87,40 +99,99 @@ class TransactionViewSet(viewsets.ModelViewSet):
             # If not paid, consider it upcoming or past due
             upcoming_fixed_expenses += expense.amount
             
-        # Last 7 days expenses
-        last_7_days_expenses = []
-        for i in range(6, -1, -1):
-            day = today - datetime.timedelta(days=i)
-            
-            day_txs = Transaction.objects.filter(
-                user=self.request.user, 
-                is_deleted=False, 
-                type='OUT', 
-                is_transfer=False,
-                date=day
-            )
-            
-            day_total = day_txs.aggregate(Sum('amount'))['amount__sum'] or 0
-            
-            # Fetch breakdown by category
-            day_categories = day_txs.values('category__name', 'category__color').annotate(total=Sum('amount')).order_by('-total')
-            
-            last_7_days_expenses.append({
-                'date': day.strftime('%Y-%m-%d'),
-                'total': day_total,
-                'categories': list(day_categories)
-            })
+        trend_start, trend_end, period_mode = self._get_summary_period_bounds(request)
+        expense_trend = self._build_expense_trend(queryset, trend_start, trend_end)
             
         return Response({
             'balance': incomes - expenses,
             'total_income': incomes,
             'total_expense': expenses,
+            'credit_card_expense': credit_card_expense,
             'expenses_by_category': list(expenses_by_category),
             'incomes_by_category': list(incomes_by_category),
             'accounts': accounts_data,
             'upcoming_fixed_expenses': upcoming_fixed_expenses,
-            'last_7_days_expenses': last_7_days_expenses
+            'last_7_days_expenses': expense_trend,
+            'expense_trend': expense_trend,
+            'period': {
+                'mode': period_mode,
+                'date_from': trend_start.strftime('%Y-%m-%d'),
+                'date_to': trend_end.strftime('%Y-%m-%d'),
+            }
         })
+
+    def _get_summary_period_bounds(self, request):
+        today = datetime.date.today()
+        month = request.query_params.get('month')
+        year = request.query_params.get('year')
+        date_from = parse_date(request.query_params.get('date_from', '') or '')
+        date_to = parse_date(request.query_params.get('date_to', '') or '')
+        month_year = self._parse_month_year(month, year)
+
+        if date_from or date_to:
+            start = date_from or date_to
+            end = date_to or date_from
+            if start > end:
+                start, end = end, start
+            return start, end, 'range'
+
+        if month_year:
+            month_int, year_int = month_year
+            start = datetime.date(year_int, month_int, 1)
+            if month_int == 12:
+                end = datetime.date(year_int, 12, 31)
+            else:
+                end = datetime.date(year_int, month_int + 1, 1) - datetime.timedelta(days=1)
+            return start, end, 'month'
+
+        return today - datetime.timedelta(days=6), today, 'all'
+
+    def _parse_month_year(self, month, year):
+        try:
+            month_int = int(month)
+            year_int = int(year)
+        except (TypeError, ValueError):
+            return None
+
+        if month_int < 1 or month_int > 12:
+            return None
+
+        return month_int, year_int
+
+    def _build_expense_trend(self, queryset, start, end):
+        if (end - start).days <= 62:
+            trend = []
+            current = start
+            while current <= end:
+                day_txs = queryset.filter(type='OUT', is_transfer=False, date=current)
+                day_total = day_txs.aggregate(Sum('amount'))['amount__sum'] or 0
+                day_categories = day_txs.values('category__name', 'category__color').annotate(total=Sum('amount')).order_by('-total')
+
+                trend.append({
+                    'date': current.strftime('%Y-%m-%d'),
+                    'total': day_total,
+                    'categories': list(day_categories)
+                })
+                current += datetime.timedelta(days=1)
+            return trend
+
+        monthly = (
+            queryset
+            .filter(type='OUT', is_transfer=False, date__gte=start, date__lte=end)
+            .annotate(period_month=TruncMonth('date'))
+            .values('period_month')
+            .annotate(total=Sum('amount'))
+            .order_by('period_month')
+        )
+
+        return [
+            {
+                'date': item['period_month'].strftime('%Y-%m-%d'),
+                'total': item['total'] or 0,
+                'categories': []
+            }
+            for item in monthly
+        ]
 
     @action(detail=False, methods=['post'])
     def transfer(self, request):

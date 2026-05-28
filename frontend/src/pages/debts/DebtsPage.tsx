@@ -1,8 +1,18 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Debt, financeService } from '../../services/finance';
+import { Account, Debt, financeService } from '../../services/finance';
 import { PlusCircle, Users, Loader2, ArrowRight, CheckCircle2, Trash2 } from 'lucide-react';
 import { Modal } from '../../components/ui/Modal';
+
+type EnrichedAccount = Account & { calculated_balance: number };
+
+function formatAccountBalance(account: EnrichedAccount) {
+    const balance = Number(account.calculated_balance);
+    if (account.type === 'CREDIT') {
+        return `Deuda $${Math.max(0, -balance).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+    }
+    return `$${balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+}
 
 export function DebtsPage() {
     const [activeTab, setActiveTab] = useState<'OWED_TO_ME' | 'I_OWE'>('I_OWE');
@@ -245,12 +255,26 @@ function PaymentForm({ debt, onSuccess }: { debt: Debt, onSuccess: () => void })
         queryFn: financeService.getAccounts
     });
 
+    const { data: summary } = useQuery({
+        queryKey: ['summary'],
+        queryFn: () => financeService.getSummary()
+    });
+
+    const enrichedAccounts: EnrichedAccount[] = accounts.map(acc => {
+        const summaryMatch = summary?.accounts?.find((s) => s.id === acc.id);
+        return {
+            ...acc,
+            calculated_balance: Number(summaryMatch?.calculated_balance ?? acc.balance)
+        };
+    });
+
     const mutation = useMutation({
         mutationFn: ({ id, payload }: { id: number, payload: { amount: string, account_id: number } }) => financeService.payDebt(id, payload),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['debts'] });
             queryClient.invalidateQueries({ queryKey: ['summary'] });
             queryClient.invalidateQueries({ queryKey: ['transactions'] });
+            queryClient.invalidateQueries({ queryKey: ['accounts'] });
             onSuccess();
         }
     });
@@ -287,8 +311,8 @@ function PaymentForm({ debt, onSuccess }: { debt: Debt, onSuccess: () => void })
                     required
                 >
                     <option value="">Selecciona una cuenta</option>
-                    {accounts.filter(a => a.is_active).map(acc => (
-                        <option key={acc.id} value={acc.id}>{acc.name} (${Number(acc.balance).toLocaleString()})</option>
+                    {enrichedAccounts.filter(a => a.is_active).map(acc => (
+                        <option key={acc.id} value={acc.id}>{acc.name} ({formatAccountBalance(acc)})</option>
                     ))}
                 </select>
             </div>

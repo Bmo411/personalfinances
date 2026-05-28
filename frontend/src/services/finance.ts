@@ -24,7 +24,11 @@ export interface Transaction {
 export interface TransactionQueryParams {
     month?: number;
     year?: number;
+    date_from?: string;
+    date_to?: string;
 }
+
+export type SummaryQueryParams = TransactionQueryParams;
 
 export interface SavingsGoal {
     id: number;
@@ -80,11 +84,18 @@ export interface FinanceSummary {
     balance: string;
     total_income: string;
     total_expense: string;
+    credit_card_expense: string;
     expenses_by_category: SummaryCategoryTotal[];
     incomes_by_category: SummaryCategoryTotal[];
     accounts: SummaryAccount[];
     upcoming_fixed_expenses: string;
     last_7_days_expenses: Last7DaysExpense[];
+    expense_trend: Last7DaysExpense[];
+    period: {
+        mode: 'all' | 'month' | 'range';
+        date_from: string;
+        date_to: string;
+    };
 }
 
 export interface UserProfile {
@@ -136,9 +147,9 @@ export const financeService = {
     },
 
     // Dashboard Summary
-    getSummary: async (month?: number, year?: number) => {
+    getSummary: async (params?: SummaryQueryParams) => {
         const { data } = await api.get('finance/transactions/summary/', {
-            params: { month, year }
+            params
         });
         return data as FinanceSummary;
     },
