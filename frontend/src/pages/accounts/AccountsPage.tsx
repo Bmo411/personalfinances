@@ -1,12 +1,22 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { financeService } from '../../services/finance';
+import { Account, financeService } from '../../services/finance';
 import { PlusCircle, Wallet, Loader2, CreditCard, Landmark, Target, CheckCircle2 } from 'lucide-react';
 import { Modal } from '../../components/ui/Modal';
 
+type EnrichedAccount = Account & { calculated_balance: number };
+
+function getErrorMessage(error: unknown, fallback: string) {
+    const candidate = error as { response?: { data?: unknown }; message?: string };
+    if (candidate.response?.data) {
+        return JSON.stringify(candidate.response.data);
+    }
+    return candidate.message || fallback;
+}
+
 export function AccountsPage() {
     const [isAddAccountModalOpen, setIsAddAccountModalOpen] = useState(false);
-    const [reconcilingAccount, setReconcilingAccount] = useState<any>(null);
+    const [reconcilingAccount, setReconcilingAccount] = useState<EnrichedAccount | null>(null);
 
     const { data: accounts = [], isLoading } = useQuery({
         queryKey: ['accounts'],
@@ -21,20 +31,20 @@ export function AccountsPage() {
 
     // Merge database accounts with their running calculated balances from the backend summary
     const enrichedAccounts = accounts.map(acc => {
-        const summaryMatch = summary?.accounts?.find((s: any) => s.id === acc.id);
+        const summaryMatch = summary?.accounts?.find((s) => s.id === acc.id);
         return {
             ...acc,
-            calculated_balance: summaryMatch?.calculated_balance ?? acc.balance
+            calculated_balance: Number(summaryMatch?.calculated_balance ?? acc.balance)
         };
     });
 
     const totalCash = enrichedAccounts.filter(a => a.type === 'CASH').reduce((sum, a) => sum + Number(a.calculated_balance), 0);
     const totalBank = enrichedAccounts.filter(a => a.type === 'DEBIT').reduce((sum, a) => sum + Number(a.calculated_balance), 0);
-    const totalCredit = enrichedAccounts.filter(a => a.type === 'CREDIT').reduce((sum, a) => sum + Number(a.calculated_balance), 0);
+    const totalCreditDebt = enrichedAccounts.filter(a => a.type === 'CREDIT').reduce((sum, a) => sum + Math.max(0, -Number(a.calculated_balance)), 0);
     const totalSavings = enrichedAccounts.filter(a => a.type === 'SAVINGS').reduce((sum, a) => sum + Number(a.calculated_balance), 0);
 
-    // Net total (Cash + Bank + Savings - Credit obligations)
-    const netTotal = totalCash + totalBank + totalSavings - totalCredit;
+    // Credit cards are signed balances: purchases go negative, payments move them toward zero.
+    const netTotal = enrichedAccounts.reduce((sum, a) => sum + Number(a.calculated_balance), 0);
 
     return (
         <div className="max-w-6xl mx-auto">
@@ -54,7 +64,7 @@ export function AccountsPage() {
             </header>
 
             {/* General Overview */}
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-6 gap-6 mb-8">
                 <div className="md:col-span-2 bg-gradient-to-r from-brand-700 to-brand-900 text-white rounded-2xl p-6 shadow-sm flex flex-col justify-center">
                     <h2 className="text-brand-100 font-medium mb-1">Patrimonio Líquido</h2>
                     <p className="text-4xl font-bold">
@@ -88,6 +98,15 @@ export function AccountsPage() {
                         ${totalSavings.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </p>
                 </div>
+
+                <div className="bg-[var(--bg-secondary)] rounded-2xl p-6 shadow-sm border border-brand-200">
+                    <div className="flex items-center gap-2 text-[var(--text-secondary)] font-medium mb-2 text-sm">
+                        <CreditCard size={18} /> Tarjetas
+                    </div>
+                    <p className="text-xl font-bold text-red-500">
+                        ${totalCreditDebt.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    </p>
+                </div>
             </div>
 
             {/* List of accounts */}
@@ -105,6 +124,12 @@ export function AccountsPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {enrichedAccounts.map(account => {
                         const Icon = account.type === 'CASH' ? Wallet : (account.type === 'CREDIT' ? CreditCard : (account.type === 'SAVINGS' ? Target : Landmark));
+                        const isCredit = account.type === 'CREDIT';
+                        const signedBalance = Number(account.calculated_balance);
+                        const creditDebt = Math.max(0, -signedBalance);
+                        const creditLimit = Number(account.credit_limit || 0);
+                        const availableCredit = Math.max(0, creditLimit - creditDebt);
+                        const displayBalance = isCredit ? creditDebt : signedBalance;
 
                         return (
                             <div key={account.id} className="bg-[var(--bg-secondary)] rounded-2xl p-6 shadow-sm border border-brand-200 relative overflow-hidden group hover:border-brand-400 transition-colors">
@@ -123,10 +148,15 @@ export function AccountsPage() {
 
                                 <div className="mt-4 pt-4 border-t border-brand-100 flex justify-between items-end">
                                     <div>
-                                        <p className="text-xs text-[var(--text-secondary)] mb-1">Balance Actual</p>
-                                        <p className={`text-2xl font-bold ${account.type === 'CREDIT' ? 'text-red-500' : 'text-brand-700'}`}>
-                                            ${Number(account.calculated_balance).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                        <p className="text-xs text-[var(--text-secondary)] mb-1">{isCredit ? 'Deuda Actual' : 'Balance Actual'}</p>
+                                        <p className={`text-2xl font-bold ${isCredit ? 'text-red-500' : 'text-brand-700'}`}>
+                                            ${displayBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                                         </p>
+                                        {isCredit && creditLimit > 0 && (
+                                            <p className="text-xs text-[var(--text-secondary)] mt-1">
+                                                Disponible: ${availableCredit.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                            </p>
+                                        )}
                                     </div>
 
                                     <button
@@ -135,7 +165,7 @@ export function AccountsPage() {
                                         title="Sincronizar saldo real"
                                     >
                                         <CheckCircle2 size={14} />
-                                        Ajustar Saldo
+                                        {isCredit ? 'Ajustar Deuda' : 'Ajustar Saldo'}
                                     </button>
                                 </div>
                             </div>
@@ -164,8 +194,12 @@ export function AccountsPage() {
     );
 }
 
-function ReconcileAccountForm({ account, onSuccess }: { account: any, onSuccess: () => void }) {
-    const [actualBalance, setActualBalance] = useState(account.calculated_balance?.toString() || '');
+function ReconcileAccountForm({ account, onSuccess }: { account: EnrichedAccount, onSuccess: () => void }) {
+    const isCredit = account.type === 'CREDIT';
+    const initialBalance = isCredit
+        ? Math.max(0, -Number(account.calculated_balance)).toString()
+        : account.calculated_balance?.toString() || '';
+    const [actualBalance, setActualBalance] = useState(initialBalance);
     const [notes, setNotes] = useState('');
 
     const queryClient = useQueryClient();
@@ -179,7 +213,7 @@ function ReconcileAccountForm({ account, onSuccess }: { account: any, onSuccess:
             queryClient.invalidateQueries({ queryKey: ['transactions'] });
             onSuccess();
         },
-        onError: (error: any) => {
+        onError: (error: unknown) => {
             console.error("Error reconciling account:", error);
             alert("No se pudo ajustar el saldo.");
         }
@@ -189,14 +223,14 @@ function ReconcileAccountForm({ account, onSuccess }: { account: any, onSuccess:
         e.preventDefault();
         const balance = parseFloat(actualBalance);
         if (isNaN(balance)) return;
-        mutation.mutate({ id: account.id, balance, notes });
+        mutation.mutate({ id: account.id, balance: isCredit ? -Math.abs(balance) : balance, notes });
     };
 
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
             <div>
                 <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                    ¿Cuánto dinero tienes realmente en ésta cuenta?
+                    {isCredit ? 'Cuanto debes realmente en esta tarjeta?' : 'Cuanto dinero tienes realmente en esta cuenta?'}
                 </label>
                 <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]">$</span>
@@ -212,7 +246,9 @@ function ReconcileAccountForm({ account, onSuccess }: { account: any, onSuccess:
                     />
                 </div>
                 <p className="text-xs text-[var(--text-secondary)] mt-2">
-                    Se creará un movimiento de ajuste automático para igualar este monto.
+                    {isCredit
+                        ? 'Se creara un ajuste para que la deuda de la tarjeta coincida con este monto.'
+                        : 'Se creara un movimiento de ajuste automatico para igualar este monto.'}
                 </p>
             </div>
 
@@ -256,8 +292,11 @@ function ReconcileAccountForm({ account, onSuccess }: { account: any, onSuccess:
 
 function CreateAccountForm({ onSuccess }: { onSuccess: () => void }) {
     const [name, setName] = useState('');
-    const [type, setType] = useState<'CASH' | 'DEBIT' | 'CREDIT'>('DEBIT');
+    const [type, setType] = useState<Account['type']>('DEBIT');
     const [balance, setBalance] = useState('');
+    const [creditLimit, setCreditLimit] = useState('');
+    const [statementCutDay, setStatementCutDay] = useState('');
+    const [paymentDueDay, setPaymentDueDay] = useState('');
     const [color, setColor] = useState('#0ea5e9'); // Default blueish
 
     const queryClient = useQueryClient();
@@ -269,18 +308,27 @@ function CreateAccountForm({ onSuccess }: { onSuccess: () => void }) {
             queryClient.invalidateQueries({ queryKey: ['summary'] });
             onSuccess();
         },
-        onError: (error: any) => {
-            console.error("Error creating account:", error.response?.data || error.message);
-            const errorMsg = error.response?.data
-                ? JSON.stringify(error.response.data)
-                : "Error de conexión o validación al crear cuenta.";
-            alert(`No se pudo crear: ${errorMsg}`);
+        onError: (error: unknown) => {
+            console.error("Error creating account:", error);
+            alert(`No se pudo crear: ${getErrorMessage(error, 'Error de conexion o validacion al crear cuenta.')}`);
         }
     });
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        mutation.mutate({ name, type, balance: balance || '0', color });
+        const normalizedBalance = type === 'CREDIT' && balance
+            ? (-Math.abs(Number(balance))).toFixed(2)
+            : balance || '0';
+
+        mutation.mutate({
+            name,
+            type,
+            balance: normalizedBalance,
+            color,
+            credit_limit: creditLimit || '0',
+            statement_cut_day: statementCutDay ? Number(statementCutDay) : null,
+            payment_due_day: paymentDueDay ? Number(paymentDueDay) : null,
+        });
     };
 
     return (
@@ -301,7 +349,7 @@ function CreateAccountForm({ onSuccess }: { onSuccess: () => void }) {
                 <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">Tipo de Instrumento</label>
                 <select
                     value={type}
-                    onChange={e => setType(e.target.value as any)}
+                    onChange={e => setType(e.target.value as Account['type'])}
                     className="w-full px-4 py-3 rounded-xl border border-brand-200 bg-[var(--bg-main)] text-[var(--text-primary)]"
                 >
                     <option value="DEBIT">Cuenta Bancaria / Tarjeta de Débito</option>
@@ -313,7 +361,7 @@ function CreateAccountForm({ onSuccess }: { onSuccess: () => void }) {
 
             <div>
                 <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                    Saldo Base Inicial ($) <span className="text-xs opacity-70">(Opcional)</span>
+                    {type === 'CREDIT' ? 'Deuda inicial ($)' : 'Saldo Base Inicial ($)'} <span className="text-xs opacity-70">(Opcional)</span>
                 </label>
                 <input
                     type="number"
@@ -325,6 +373,47 @@ function CreateAccountForm({ onSuccess }: { onSuccess: () => void }) {
                     placeholder="0.00"
                 />
             </div>
+
+            {type === 'CREDIT' && (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                        <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">Limite</label>
+                        <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={creditLimit}
+                            onChange={e => setCreditLimit(e.target.value)}
+                            className="w-full px-4 py-3 rounded-xl border border-brand-200 bg-[var(--bg-main)] text-[var(--text-primary)]"
+                            placeholder="0.00"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">Corte</label>
+                        <input
+                            type="number"
+                            min="1"
+                            max="31"
+                            value={statementCutDay}
+                            onChange={e => setStatementCutDay(e.target.value)}
+                            className="w-full px-4 py-3 rounded-xl border border-brand-200 bg-[var(--bg-main)] text-[var(--text-primary)]"
+                            placeholder="15"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">Pago</label>
+                        <input
+                            type="number"
+                            min="1"
+                            max="31"
+                            value={paymentDueDay}
+                            onChange={e => setPaymentDueDay(e.target.value)}
+                            className="w-full px-4 py-3 rounded-xl border border-brand-200 bg-[var(--bg-main)] text-[var(--text-primary)]"
+                            placeholder="5"
+                        />
+                    </div>
+                </div>
+            )}
 
             <div>
                 <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">Pintar icono de color:</label>

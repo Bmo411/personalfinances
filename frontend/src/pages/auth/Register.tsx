@@ -20,8 +20,9 @@ export function Register() {
         try {
             await api.post('auth/register/', { username, email, password });
             navigate('/login');
-        } catch (err: any) {
-            setError(err.response?.data?.error || 'Error al crear la cuenta. Intente con otro usuario.');
+        } catch (err: unknown) {
+            const apiError = err as { response?: { data?: { error?: string } } };
+            setError(apiError.response?.data?.error || 'Error al crear la cuenta. Intente con otro usuario.');
         } finally {
             setLoading(false);
         }

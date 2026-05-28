@@ -1,9 +1,15 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { financeService } from '../../services/finance';
+import { financeService, SummaryCategoryTotal } from '../../services/finance';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { PlusCircle, Tag, TrendingDown, TrendingUp, Loader2 } from 'lucide-react';
 import { Modal } from '../../components/ui/Modal';
+
+type ChartItem = {
+    name: string;
+    value: number;
+    color: string;
+};
 
 export function CategoriesPage() {
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -22,13 +28,13 @@ export function CategoriesPage() {
     const filteredCategories = categories.filter(c => c.type === activeTab);
 
     // For PieChart
-    const expensesData = summary?.expenses_by_category?.map((item: any) => ({
+    const expensesData: ChartItem[] = summary?.expenses_by_category?.map((item: SummaryCategoryTotal) => ({
         name: item.category__name || 'General',
         value: Number(item.total),
         color: item.category__color || '#9ca3af'
     })) || [];
 
-    const incomesData = summary?.incomes_by_category?.map((item: any) => ({
+    const incomesData: ChartItem[] = summary?.incomes_by_category?.map((item: SummaryCategoryTotal) => ({
         name: item.category__name || 'General',
         value: Number(item.total),
         color: item.category__color || '#9ca3af'
@@ -84,7 +90,7 @@ export function CategoriesPage() {
                                         dataKey="value"
                                         stroke="none"
                                     >
-                                        {chartData.map((entry: any, index: number) => (
+                                        {chartData.map((entry: ChartItem, index: number) => (
                                             <Cell
                                                 key={`cell-${index}`}
                                                 fill={entry.color}
@@ -94,7 +100,7 @@ export function CategoriesPage() {
                                         ))}
                                     </Pie>
                                     <Tooltip
-                                        formatter={(value: any, name: any) => [`$${Number(value).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, name]}
+                                        formatter={(value: number | string | undefined, name: string | undefined) => [`$${Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, name || 'Total']}
                                         contentStyle={{ borderRadius: '12px', border: '1px solid var(--brand-200)', backgroundColor: 'var(--bg-main)', color: 'var(--text-primary)' }}
                                     />
                                     <Legend />
@@ -143,11 +149,11 @@ export function CategoriesPage() {
                                                     borderColor: 'var(--brand-100)',
                                                     // CSS variable used to style on hover via Tailwind
                                                     '--hover-border': cat.color || '#9ca3af',
-                                                    '--hover-bg': `${cat.color}15` || '#f3f4f6' // 15 is hex opacity (approx 8%)
+                                                    '--hover-bg': cat.color ? `${cat.color}15` : '#f3f4f6' // 15 is hex opacity (approx 8%)
                                                 } as React.CSSProperties}
                                                 onMouseEnter={(e) => {
                                                     e.currentTarget.style.borderColor = cat.color || '#9ca3af';
-                                                    e.currentTarget.style.backgroundColor = `${cat.color}15` || '#f3f4f6';
+                                                    e.currentTarget.style.backgroundColor = cat.color ? `${cat.color}15` : '#f3f4f6';
                                                 }}
                                                 onMouseLeave={(e) => {
                                                     e.currentTarget.style.borderColor = 'var(--brand-100)';

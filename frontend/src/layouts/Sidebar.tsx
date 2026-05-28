@@ -1,17 +1,18 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
-import { Wallet2, LayoutDashboard, History, PiggyBank, LogOut, Settings, Target, Users, CalendarClock } from 'lucide-react';
+import { Wallet2, LayoutDashboard, History, PiggyBank, LogOut, Settings, Target, Users, CalendarClock, CreditCard } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
 // Helper temporal
-export function cn(...inputs: (string | undefined | null | false)[]) {
+function cn(...inputs: (string | undefined | null | false)[]) {
     return twMerge(clsx(inputs));
 }
 
 const navItems = [
     { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
     { icon: Wallet2, label: 'Cuentas', path: '/accounts' },
+    { icon: CreditCard, label: 'Tarjetas', path: '/credit-cards' },
     { icon: CalendarClock, label: 'Gastos Fijos', path: '/recurring' },
     { icon: History, label: 'Historial', path: '/history' },
     { icon: PiggyBank, label: 'Categorías', path: '/categories' },

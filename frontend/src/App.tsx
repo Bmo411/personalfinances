@@ -6,6 +6,7 @@ import { Register } from './pages/auth/Register'
 import { Dashboard } from './pages/dashboard/Dashboard'
 import { PreferencesPage } from './pages/preferences/PreferencesPage';
 import { AccountsPage } from './pages/accounts/AccountsPage';
+import { CreditCardsPage } from './pages/credit-cards/CreditCardsPage';
 import { SavingsPage } from './pages/savings/SavingsPage';
 import { DebtsPage } from './pages/debts/DebtsPage';
 import { RecurringPage } from './pages/recurring/RecurringPage';
@@ -25,6 +26,7 @@ function App() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/preferences" element={<PreferencesPage />} />
           <Route path="/accounts" element={<AccountsPage />} />
+          <Route path="/credit-cards" element={<CreditCardsPage />} />
           <Route path="/recurring" element={<RecurringPage />} />
           <Route path="/savings" element={<SavingsPage />} />
           <Route path="/debts" element={<DebtsPage />} />

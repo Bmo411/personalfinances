@@ -8,6 +8,14 @@ interface AccountSelectorProps {
     onChange: (accountId: number) => void;
 }
 
+function formatAccountBalance(account: { type: string; calculated_balance: number }) {
+    const balance = Number(account.calculated_balance);
+    if (account.type === 'CREDIT') {
+        return `Deuda $${Math.max(0, -balance).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+    }
+    return `$${balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+}
+
 export function AccountSelector({ value, onChange }: AccountSelectorProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [search, setSearch] = useState('');
@@ -46,10 +54,10 @@ export function AccountSelector({ value, onChange }: AccountSelectorProps) {
     });
 
     const enrichedAccounts = accounts.map(acc => {
-        const summaryMatch = summary?.accounts?.find((s: any) => s.id === acc.id);
+        const summaryMatch = summary?.accounts?.find((s) => s.id === acc.id);
         return {
             ...acc,
-            calculated_balance: summaryMatch?.calculated_balance ?? acc.balance
+            calculated_balance: Number(summaryMatch?.calculated_balance ?? acc.balance)
         };
     });
 
@@ -89,7 +97,7 @@ export function AccountSelector({ value, onChange }: AccountSelectorProps) {
                     />
                 ) : (
                     <span className={selectedAcc ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}>
-                        {selectedAcc ? `${selectedAcc.name} ($${Number(selectedAcc.calculated_balance).toLocaleString('en-US', { minimumFractionDigits: 2 })})` : 'Seleccionar cuenta...'}
+                        {selectedAcc ? `${selectedAcc.name} (${formatAccountBalance(selectedAcc)})` : 'Seleccionar cuenta...'}
                     </span>
                 )}
             </div>
@@ -109,7 +117,7 @@ export function AccountSelector({ value, onChange }: AccountSelectorProps) {
                                 >
                                     <div>
                                         <div className="text-[var(--text-primary)] font-medium">{acc.name}</div>
-                                        <div className="text-xs text-[var(--text-secondary)]">{acc.type === 'CASH' ? 'Efectivo' : (acc.type === 'CREDIT' ? 'Crédito' : (acc.type === 'SAVINGS' ? 'Ahorro' : 'Banco'))} • ${Number(acc.calculated_balance).toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
+                                        <div className="text-xs text-[var(--text-secondary)]">{acc.type === 'CASH' ? 'Efectivo' : (acc.type === 'CREDIT' ? 'Credito' : (acc.type === 'SAVINGS' ? 'Ahorro' : 'Banco'))} • {formatAccountBalance(acc)}</div>
                                     </div>
                                     {value === acc.id && <Check size={16} className="text-brand-700" />}
                                 </button>

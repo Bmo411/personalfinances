@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { PlusCircle, TrendingDown, TrendingUp, Wallet2, CalendarClock, BarChart3, Activity } from 'lucide-react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid } from 'recharts';
 import { useQuery } from '@tanstack/react-query';
-import { financeService } from '../../services/finance';
+import { financeService, SummaryCategoryTotal } from '../../services/finance';
 import { Modal } from '../../components/ui/Modal';
 import { TransactionForm } from '../../components/transactions/TransactionForm';
 
@@ -21,10 +21,8 @@ export function Dashboard() {
     const upcomingFixed = Number(summary?.upcoming_fixed_expenses || 0);
     const last7DaysExpenses = summary?.last_7_days_expenses || [];
 
-    const calculatedTotalNetworth = accounts.reduce((sum: number, acc: any) => {
-        // Credit cards are negative balances for networth
-        const val = Number(acc.calculated_balance);
-        return acc.type === 'CREDIT' ? sum - val : sum + val;
+    const calculatedTotalNetworth = accounts.reduce((sum, acc) => {
+        return sum + Number(acc.calculated_balance);
     }, 0);
 
     const chartData = [
@@ -128,7 +126,7 @@ export function Dashboard() {
                                                         {data.categories && data.categories.length > 0 && (
                                                             <div className="space-y-1 mt-2">
                                                                 <p className="text-xs text-[var(--text-secondary)] font-medium">Desglose:</p>
-                                                                {data.categories.map((cat: any, i: number) => (
+                                                                {data.categories.map((cat: SummaryCategoryTotal, i: number) => (
                                                                     <div key={i} className="flex items-center justify-between text-xs">
                                                                         <div className="flex items-center gap-1.5">
                                                                             <span className="w-2 h-2 rounded-full" style={{ backgroundColor: cat.category__color || '#ccc' }}></span>
@@ -173,7 +171,7 @@ export function Dashboard() {
                                     <Tooltip
                                         cursor={{ fill: 'var(--bg-hover)' }}
                                         contentStyle={{ borderRadius: '12px', border: '1px solid var(--brand-200)', backgroundColor: 'var(--bg-main)', color: 'var(--text-primary)' }}
-                                        formatter={(value: any) => [`$${Number(value).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, 'Total']}
+                                        formatter={(value: number | string | undefined) => [`$${Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, 'Total']}
                                     />
                                     <Bar dataKey="value" radius={[6, 6, 0, 0]}>
                                         {chartData.map((entry, index) => (

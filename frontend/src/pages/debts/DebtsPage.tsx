@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { financeService } from '../../services/finance';
+import { Debt, financeService } from '../../services/finance';
 import { PlusCircle, Users, Loader2, ArrowRight, CheckCircle2, Trash2 } from 'lucide-react';
 import { Modal } from '../../components/ui/Modal';
 
@@ -234,7 +234,7 @@ function CreateDebtForm({ onSuccess }: { onSuccess: () => void }) {
     );
 }
 
-function PaymentForm({ debt, onSuccess }: { debt: any, onSuccess: () => void }) {
+function PaymentForm({ debt, onSuccess }: { debt: Debt, onSuccess: () => void }) {
     const [amount, setAmount] = useState('');
     const [accountId, setAccountId] = useState<number | ''>('');
     const queryClient = useQueryClient();

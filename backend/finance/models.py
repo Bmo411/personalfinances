@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+from django.core.validators import MaxValueValidator, MinValueValidator
 
 class Category(models.Model):
     TYPE_CHOICES = (('IN', 'Ingreso'), ('OUT', 'Egreso'))
@@ -99,6 +100,19 @@ class Account(models.Model):
     name = models.CharField(max_length=100)
     type = models.CharField(max_length=10, choices=TYPE_CHOICES)
     balance = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    credit_limit = models.DecimalField(max_digits=12, decimal_places=2, default=0.00, blank=True)
+    statement_cut_day = models.PositiveSmallIntegerField(
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1), MaxValueValidator(31)],
+        help_text="Credit card statement cut day (1-31)",
+    )
+    payment_due_day = models.PositiveSmallIntegerField(
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1), MaxValueValidator(31)],
+        help_text="Credit card payment due day (1-31)",
+    )
     color = models.CharField(max_length=7, default='#97A97C') # Hex
     is_active = models.BooleanField(default=True)
     

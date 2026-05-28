@@ -9,6 +9,10 @@ interface TransactionFormProps {
     onSuccess: () => void;
 }
 
+type TransferPayload = Parameters<typeof financeService.createTransfer>[0];
+type TransactionPayload = Parameters<typeof financeService.createTransaction>[0];
+type TransactionMutationPayload = TransferPayload | TransactionPayload;
+
 export function TransactionForm({ onSuccess }: TransactionFormProps) {
     const [type, setType] = useState<'IN' | 'OUT' | 'TRANSFER'>('OUT');
     const [amount, setAmount] = useState('');
@@ -21,7 +25,9 @@ export function TransactionForm({ onSuccess }: TransactionFormProps) {
     const queryClient = useQueryClient();
 
     const mutation = useMutation({
-        mutationFn: (data: any) => type === 'TRANSFER' ? financeService.createTransfer(data) : financeService.createTransaction(data),
+        mutationFn: (data: TransactionMutationPayload) => type === 'TRANSFER'
+            ? financeService.createTransfer(data as TransferPayload)
+            : financeService.createTransaction(data as TransactionPayload),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['transactions'] });
             queryClient.invalidateQueries({ queryKey: ['summary'] });

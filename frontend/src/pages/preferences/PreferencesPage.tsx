@@ -140,7 +140,7 @@ export function PreferencesPage() {
             // Con no-cors no podemos leer la respuesta, pero si llegó aquí el request se envió
             setTestStatus('ok');
             setTestMessage('Solicitud enviada. Deberías recibir el WhatsApp en unos segundos. ✅');
-        } catch (e: any) {
+        } catch {
             setTestStatus('error');
             setTestMessage('No se pudo enviar. Verifica tu conexión a internet.');
         }

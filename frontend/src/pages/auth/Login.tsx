@@ -22,7 +22,7 @@ export function Login() {
             const response = await api.post('auth/login/', { username, password });
             setTokens(response.data.access, response.data.refresh);
             navigate('/');
-        } catch (err: unknown) {
+        } catch {
             setError('Credenciales incorrectas o problema de conexión.');
         } finally {
             setLoading(false);

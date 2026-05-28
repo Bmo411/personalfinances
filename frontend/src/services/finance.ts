@@ -18,6 +18,12 @@ export interface Transaction {
     category_name?: string;
     payment_method: 'CASH' | 'CARD' | 'TRANSFER';
     description?: string;
+    is_transfer?: boolean;
+}
+
+export interface TransactionQueryParams {
+    month?: number;
+    year?: number;
 }
 
 export interface SavingsGoal {
@@ -46,9 +52,39 @@ export interface Account {
     name: string;
     type: 'CASH' | 'DEBIT' | 'CREDIT' | 'SAVINGS';
     balance: string;
+    credit_limit: string;
+    statement_cut_day: number | null;
+    payment_due_day: number | null;
     color: string;
     is_active: boolean;
     calculated_balance?: number; // Added from backend summary
+}
+
+export interface SummaryAccount extends Account {
+    calculated_balance: number;
+}
+
+export interface SummaryCategoryTotal {
+    category__name: string | null;
+    category__color: string | null;
+    total: string;
+}
+
+export interface Last7DaysExpense {
+    date: string;
+    total: string;
+    categories: SummaryCategoryTotal[];
+}
+
+export interface FinanceSummary {
+    balance: string;
+    total_income: string;
+    total_expense: string;
+    expenses_by_category: SummaryCategoryTotal[];
+    incomes_by_category: SummaryCategoryTotal[];
+    accounts: SummaryAccount[];
+    upcoming_fixed_expenses: string;
+    last_7_days_expenses: Last7DaysExpense[];
 }
 
 export interface UserProfile {
@@ -83,7 +119,7 @@ export const financeService = {
     },
 
     // Transacciones
-    getTransactions: async (params?: any) => {
+    getTransactions: async (params?: TransactionQueryParams) => {
         const { data } = await api.get('finance/transactions/', { params });
         return data as Transaction[];
     },
@@ -104,7 +140,7 @@ export const financeService = {
         const { data } = await api.get('finance/transactions/summary/', {
             params: { month, year }
         });
-        return data;
+        return data as FinanceSummary;
     },
 
     // Ahorros
@@ -157,7 +193,7 @@ export const financeService = {
         return data as Account;
     },
     updateAccount: async (id: number, account: Partial<Account>) => {
-        const { data } = await api.put(`finance/accounts/${id}/`, account);
+        const { data } = await api.patch(`finance/accounts/${id}/`, account);
         return data as Account;
     },
     reconcileAccount: async (id: number, actualBalance: number, notes: string) => {

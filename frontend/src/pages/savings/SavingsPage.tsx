@@ -28,20 +28,19 @@ export function SavingsPage() {
 
     // Merge database accounts with their running calculated balances from the backend summary
     const enrichedAccounts = accounts.map(acc => {
-        const summaryMatch = summary?.accounts?.find((s: any) => s.id === acc.id);
+        const summaryMatch = summary?.accounts?.find((s) => s.id === acc.id);
         return {
             ...acc,
-            calculated_balance: summaryMatch?.calculated_balance ?? acc.balance
+            calculated_balance: Number(summaryMatch?.calculated_balance ?? acc.balance)
         };
     });
 
     const totalSaved = goals.reduce((sum, goal) => sum + Number(goal.current_amount), 0);
 
-    // Calculate liquid available balance exactly like in AccountsPage
+    // Liquid availability is money you can actually spend now; credit limits are not liquidity.
     const availableBalance = enrichedAccounts.reduce((sum, a) => {
         const val = Number(a.calculated_balance);
         if (a.type === 'CASH' || a.type === 'DEBIT') return sum + val;
-        if (a.type === 'CREDIT') return sum - val;
         return sum;
     }, 0);
 
@@ -86,7 +85,7 @@ export function SavingsPage() {
                         ${availableBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </p>
                     <p className="text-xs text-[var(--text-secondary)] mt-1">
-                        Este es el dinero de tus ingresos que aún no has gastado ni apartado.
+                        No incluye lineas de credito ni inversiones separadas.
                     </p>
                 </div>
             </div>
@@ -358,8 +357,9 @@ function WithdrawFundsForm({ goalId, goalName, maxAmount, onSuccess }: { goalId:
             queryClient.invalidateQueries({ queryKey: ['accounts'] });
             onSuccess();
         },
-        onError: (error: any) => {
-            alert(error.response?.data?.error || 'Error al retirar fondos');
+        onError: (error: unknown) => {
+            const apiError = error as { response?: { data?: { error?: string } } };
+            alert(apiError.response?.data?.error || 'Error al retirar fondos');
         }
     });
 

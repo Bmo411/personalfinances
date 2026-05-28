@@ -1,10 +1,10 @@
 import datetime
+from decimal import Decimal, InvalidOperation
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from django.db.models import Sum, Q 
-from django.db.models import Sum, Q 
+from django.db.models import Sum
 from .models import Category, Transaction, SavingsGoal, Debt, Account, RecurringExpense
 from .serializers import CategorySerializer, TransactionSerializer, SavingsGoalSerializer, DebtSerializer, AccountSerializer, RecurringExpenseSerializer
 
@@ -67,6 +67,11 @@ class TransactionViewSet(viewsets.ModelViewSet):
                 'name': account.name,
                 'type': account.type,
                 'color': account.color,
+                'is_active': account.is_active,
+                'balance': account.balance,
+                'credit_limit': account.credit_limit,
+                'statement_cut_day': account.statement_cut_day,
+                'payment_due_day': account.payment_due_day,
                 'calculated_balance': calculated_balance
             })
             
@@ -346,19 +351,19 @@ class AccountViewSet(viewsets.ModelViewSet):
             return Response({'error': 'actual_balance is required'}, status=400)
 
         try:
-            actual_balance = float(actual_balance)
-        except ValueError:
+            actual_balance = Decimal(str(actual_balance))
+        except (InvalidOperation, ValueError):
             return Response({'error': 'Invalid actual_balance'}, status=400)
 
         # Calculate current balance (same logic as summary)
         account_txs = Transaction.objects.filter(user=self.request.user, is_deleted=False, account=account)
-        acc_incomes = account_txs.filter(type='IN').aggregate(Sum('amount'))['amount__sum'] or 0
-        acc_expenses = account_txs.filter(type='OUT').aggregate(Sum('amount'))['amount__sum'] or 0
+        acc_incomes = account_txs.filter(type='IN').aggregate(Sum('amount'))['amount__sum'] or Decimal('0.00')
+        acc_expenses = account_txs.filter(type='OUT').aggregate(Sum('amount'))['amount__sum'] or Decimal('0.00')
         
-        current_calculated_balance = float(account.balance) + float(acc_incomes) - float(acc_expenses)
+        current_calculated_balance = account.balance + acc_incomes - acc_expenses
         diff = actual_balance - current_calculated_balance
 
-        if diff == 0:
+        if diff == Decimal('0.00'):
             return Response({'message': 'Balance is already correct', 'balance': actual_balance})
 
         tx_type = 'IN' if diff > 0 else 'OUT'
@@ -376,7 +381,7 @@ class AccountViewSet(viewsets.ModelViewSet):
             date=datetime.date.today(),
             description=description,
             payment_method='TRANSFER', # Using TRANSFER as it's an internal adjustment
-            is_transfer=True # Mark as transfer to avoid inflating gross income/expenses
+            is_transfer=False
         )
 
         return Response({
