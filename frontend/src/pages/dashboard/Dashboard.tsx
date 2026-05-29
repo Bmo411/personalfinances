@@ -67,13 +67,11 @@ export function Dashboard() {
     const totalIncome = Number(summary?.total_income || 0);
     const totalExpense = Number(summary?.total_expense || 0);
     const creditCardExpense = Number(summary?.credit_card_expense || 0);
-    const accounts = summary?.accounts || [];
+    const liquidBalance = Number(summary?.liquid_balance || 0);
+    const netWorth = Number(summary?.net_worth || 0);
+    const creditCardDebt = Number(summary?.credit_card_debt || 0);
     const upcomingFixed = Number(summary?.upcoming_fixed_expenses || 0);
     const expenseTrend = summary?.expense_trend ?? summary?.last_7_days_expenses ?? [];
-
-    const calculatedTotalNetworth = accounts.reduce((sum, acc) => {
-        return sum + Number(acc.calculated_balance);
-    }, 0);
 
     const chartData = [
         { name: 'Ingresos', value: totalIncome, color: '#16a34a' },
@@ -166,21 +164,30 @@ export function Dashboard() {
             {isLoading ? (
                 <div className="h-40 flex items-center justify-center text-[var(--text-secondary)]">Cargando datos...</div>
             ) : (
-                <main className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <main className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6">
                     <div className="bg-[var(--bg-secondary)] rounded-2xl p-6 shadow-sm border border-brand-200 md:col-span-2 lg:col-span-1 relative overflow-hidden group">
                         <div className="flex items-center gap-3 mb-2 relative z-10">
                             <div className="p-2 bg-brand-50 rounded-xl text-brand-700">
                                 <Wallet2 size={24} />
                             </div>
-                            <h2 className="text-[var(--text-secondary)] font-medium">Patrimonio actual</h2>
+                            <h2 className="text-[var(--text-secondary)] font-medium">Liquidez disponible</h2>
                         </div>
                         <p className="text-4xl font-bold text-[var(--text-primary)] relative z-10">
-                            ${currencyFormatter.format(calculatedTotalNetworth)}
+                            ${currencyFormatter.format(liquidBalance)}
                         </p>
 
                         <div className="absolute -bottom-6 -right-6 text-brand-100 opacity-50 group-hover:scale-110 transition-transform duration-500">
                             <Wallet2 size={120} />
                         </div>
+                    </div>
+
+                    <div className="bg-[var(--bg-secondary)] rounded-2xl p-6 shadow-sm border border-brand-200">
+                        <h2 className="text-[var(--text-secondary)] font-medium mb-2 flex items-center gap-2">
+                            <Wallet2 size={18} className="text-brand-700" /> Patrimonio neto
+                        </h2>
+                        <p className="text-2xl font-bold text-[var(--text-primary)]">
+                            ${currencyFormatter.format(netWorth)}
+                        </p>
                     </div>
 
                     <div className="bg-[var(--bg-secondary)] rounded-2xl p-6 shadow-sm border border-brand-200">
@@ -203,14 +210,23 @@ export function Dashboard() {
 
                     <div className="bg-[var(--bg-secondary)] rounded-2xl p-6 shadow-sm border border-brand-200">
                         <h2 className="text-[var(--text-secondary)] font-medium mb-2 flex items-center gap-2">
-                            <CreditCard size={18} className="text-amber-600" /> Gasto en credito
+                            <CreditCard size={18} className="text-red-500" /> Deuda tarjetas
+                        </h2>
+                        <p className="text-2xl font-bold text-red-500">
+                            ${currencyFormatter.format(creditCardDebt)}
+                        </p>
+                    </div>
+
+                    <div className="bg-[var(--bg-secondary)] rounded-2xl p-6 shadow-sm border border-brand-200">
+                        <h2 className="text-[var(--text-secondary)] font-medium mb-2 flex items-center gap-2">
+                            <CreditCard size={18} className="text-amber-600" /> Gasto credito
                         </h2>
                         <p className="text-2xl font-bold text-amber-600">
                             ${currencyFormatter.format(creditCardExpense)}
                         </p>
                     </div>
 
-                    <div className="bg-[var(--bg-secondary)] rounded-2xl p-6 shadow-sm border border-brand-200 md:col-span-2 lg:col-span-3">
+                    <div className="bg-[var(--bg-secondary)] rounded-2xl p-6 shadow-sm border border-brand-200 md:col-span-2 lg:col-span-5">
                         <h2 className="text-[var(--text-secondary)] font-medium mb-6 flex items-center gap-2">
                             <Activity size={18} className="text-red-500" /> {trendTitle}
                         </h2>

@@ -85,6 +85,11 @@ export interface FinanceSummary {
     total_income: string;
     total_expense: string;
     credit_card_expense: string;
+    liquid_balance: string;
+    savings_balance: string;
+    credit_card_debt: string;
+    credit_available: string;
+    net_worth: string;
     expenses_by_category: SummaryCategoryTotal[];
     incomes_by_category: SummaryCategoryTotal[];
     accounts: SummaryAccount[];
@@ -206,6 +211,9 @@ export const financeService = {
     updateAccount: async (id: number, account: Partial<Account>) => {
         const { data } = await api.patch(`finance/accounts/${id}/`, account);
         return data as Account;
+    },
+    deleteAccount: async (id: number) => {
+        await api.delete(`finance/accounts/${id}/`);
     },
     reconcileAccount: async (id: number, actualBalance: number, notes: string) => {
         const { data } = await api.post(`finance/accounts/${id}/reconcile/`, {

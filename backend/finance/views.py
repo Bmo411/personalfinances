@@ -63,6 +63,12 @@ class TransactionViewSet(viewsets.ModelViewSet):
         # Calculate exactly how much money we have physically or in the bank by matching Accounts against Transactions
         accounts = Account.objects.filter(user=self.request.user)
         accounts_data = []
+        liquid_balance = Decimal('0.00')
+        savings_balance = Decimal('0.00')
+        credit_card_debt = Decimal('0.00')
+        credit_available = Decimal('0.00')
+        net_worth = Decimal('0.00')
+
         for account in accounts:
             # We must sum all incomes towards this account and subtract all expenses from it
             # Initial balance + (Incomes) - (Expenses)
@@ -74,6 +80,17 @@ class TransactionViewSet(viewsets.ModelViewSet):
             acc_expenses = account_txs.filter(type='OUT').aggregate(Sum('amount'))['amount__sum'] or 0
             
             calculated_balance = account.balance + acc_incomes - acc_expenses
+            net_worth += calculated_balance
+
+            if account.type in ['CASH', 'DEBIT']:
+                liquid_balance += calculated_balance
+            elif account.type == 'SAVINGS':
+                savings_balance += calculated_balance
+            elif account.type == 'CREDIT':
+                card_debt = max(Decimal('0.00'), -calculated_balance)
+                credit_card_debt += card_debt
+                credit_available += max(Decimal('0.00'), account.credit_limit - card_debt)
+
             accounts_data.append({
                 'id': account.id,
                 'name': account.name,
@@ -107,6 +124,11 @@ class TransactionViewSet(viewsets.ModelViewSet):
             'total_income': incomes,
             'total_expense': expenses,
             'credit_card_expense': credit_card_expense,
+            'liquid_balance': liquid_balance,
+            'savings_balance': savings_balance,
+            'credit_card_debt': credit_card_debt,
+            'credit_available': credit_available,
+            'net_worth': net_worth,
             'expenses_by_category': list(expenses_by_category),
             'incomes_by_category': list(incomes_by_category),
             'accounts': accounts_data,

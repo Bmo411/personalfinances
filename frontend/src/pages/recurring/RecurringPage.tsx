@@ -63,10 +63,10 @@ export function RecurringPage() {
             <div className="mb-6 flex items-start gap-3 bg-green-50 border border-green-200 rounded-xl px-5 py-4 text-green-800">
                 <BellRing size={20} className="mt-0.5 shrink-0 text-green-600" />
                 <div className="text-sm">
-                    <span className="font-semibold">¿Sabías que puedes recibir recordatorios por WhatsApp?</span>
-                    {' '}El sistema te avisará automáticamente <strong>7 días</strong> y <strong>3 días</strong> antes de cada cobro.{' '}
+                    <span className="font-semibold">Puedes recibir recordatorios por WhatsApp.</span>
+                    {' '}El sistema te avisara automaticamente <strong>7, 3 y 1 dias</strong> antes, y tambien el mismo dia, para gastos fijos y tarjetas de credito.{' '}
                     <Link to="/preferences" className="underline font-semibold hover:text-green-900 transition-colors">
-                        Actívalo en Preferencias →
+                        Activalo en Preferencias
                     </Link>
                 </div>
             </div>

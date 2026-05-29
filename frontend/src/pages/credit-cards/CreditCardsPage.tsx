@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CalendarClock, CheckCircle2, CreditCard, Loader2, Pencil, PlusCircle, Wallet2 } from 'lucide-react';
+import { CalendarClock, CheckCircle2, CreditCard, Loader2, Pencil, PlusCircle, Trash2, Wallet2 } from 'lucide-react';
 import { Account, financeService } from '../../services/finance';
 import { Modal } from '../../components/ui/Modal';
 
@@ -67,6 +67,7 @@ function getCycleWindow(cutDay: number | null, today: Date) {
 export function CreditCardsPage() {
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [editingCard, setEditingCard] = useState<CreditCardAccount | null>(null);
+    const queryClient = useQueryClient();
 
     const { data: accounts = [], isLoading: loadingAccounts } = useQuery({
         queryKey: ['accounts'],
@@ -81,6 +82,15 @@ export function CreditCardsPage() {
     const { data: transactions = [], isLoading: loadingTransactions } = useQuery({
         queryKey: ['transactions', 'credit-cards'],
         queryFn: () => financeService.getTransactions(),
+    });
+
+    const deleteMutation = useMutation({
+        mutationFn: financeService.deleteAccount,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['accounts'] });
+            queryClient.invalidateQueries({ queryKey: ['summary'] });
+            queryClient.invalidateQueries({ queryKey: ['transactions'] });
+        },
     });
 
     const today = new Date();
@@ -100,6 +110,21 @@ export function CreditCardsPage() {
     const cycleTotal = creditCards.reduce((sum, card) => sum + getCycleSpend(card, transactions, today), 0);
 
     const loading = loadingAccounts || loadingTransactions;
+
+    const handleDeleteCard = (card: CreditCardAccount, debt: number) => {
+        if (debt > 0) {
+            alert('Primero deja la deuda de la tarjeta en $0.00 antes de borrarla.');
+            return;
+        }
+
+        const confirmed = window.confirm(
+            `Borrar la tarjeta "${card.name}"? Sus movimientos se conservan en el historial, pero dejaran de estar asociados a esta tarjeta.`
+        );
+
+        if (confirmed) {
+            deleteMutation.mutate(card.id);
+        }
+    };
 
     return (
         <div className="max-w-6xl mx-auto pb-12">
@@ -179,13 +204,25 @@ export function CreditCardsPage() {
                                             <p className="text-sm text-[var(--text-secondary)]">Corte {card.statement_cut_day || '-'} / Pago {card.payment_due_day || '-'}</p>
                                         </div>
                                     </div>
-                                    <button
-                                        onClick={() => setEditingCard(card)}
-                                        className="p-2 rounded-lg text-[var(--text-secondary)] hover:bg-brand-50 hover:text-brand-700 transition-colors"
-                                        title="Editar tarjeta"
-                                    >
-                                        <Pencil size={18} />
-                                    </button>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={() => setEditingCard(card)}
+                                            className="p-2 rounded-lg text-[var(--text-secondary)] hover:bg-brand-50 hover:text-brand-700 transition-colors"
+                                            title="Editar tarjeta"
+                                        >
+                                            <Pencil size={18} />
+                                        </button>
+                                        <button
+                                            onClick={() => handleDeleteCard(card, debt)}
+                                            disabled={deleteMutation.isPending}
+                                            className="p-2 rounded-lg text-[var(--text-secondary)] hover:bg-red-50 hover:text-red-600 transition-colors disabled:opacity-50"
+                                            title="Borrar tarjeta"
+                                        >
+                                            {deleteMutation.isPending && deleteMutation.variables === card.id
+                                                ? <Loader2 size={18} className="animate-spin" />
+                                                : <Trash2 size={18} />}
+                                        </button>
+                                    </div>
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-4 mb-5">

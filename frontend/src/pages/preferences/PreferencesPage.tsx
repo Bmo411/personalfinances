@@ -132,14 +132,14 @@ export function PreferencesPage() {
         // Llamar a CallMeBot directo desde el navegador
         try {
             const phone = localPhone.trim().replace(/\+/g, '');
-            const message = encodeURIComponent('✅ Conexión exitosa con tu app de finanzas. Las notificaciones de gastos fijos están activas.');
+            const message = encodeURIComponent('Conexion exitosa con tu app de finanzas. Las notificaciones de gastos fijos y tarjetas estan activas.');
             await fetch(
                 `https://api.callmebot.com/whatsapp.php?phone=${phone}&text=${message}&apikey=${localApiKey.trim()}`,
                 { mode: 'no-cors' }
             );
             // Con no-cors no podemos leer la respuesta, pero si llegó aquí el request se envió
             setTestStatus('ok');
-            setTestMessage('Solicitud enviada. Deberías recibir el WhatsApp en unos segundos. ✅');
+            setTestMessage('Solicitud enviada. Deberias recibir el WhatsApp en unos segundos.');
         } catch {
             setTestStatus('error');
             setTestMessage('No se pudo enviar. Verifica tu conexión a internet.');
@@ -240,7 +240,7 @@ export function PreferencesPage() {
                     </button>
                 </div>
                 <p className="text-sm text-[var(--text-secondary)] mb-6">
-                    Recibe un aviso por WhatsApp cuando un gasto fijo esté próximo a cobrar.
+                    Recibe avisos por WhatsApp para gastos fijos, cortes de tarjeta y fechas limite de pago.
                     Requiere una cuenta de{' '}
                     <a href="https://www.callmebot.com/blog/free-api-whatsapp-messages/" target="_blank" rel="noreferrer" className="text-green-600 underline font-medium">
                         CallMeBot

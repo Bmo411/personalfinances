@@ -43,8 +43,8 @@ export function AccountsPage() {
     const totalCreditDebt = enrichedAccounts.filter(a => a.type === 'CREDIT').reduce((sum, a) => sum + Math.max(0, -Number(a.calculated_balance)), 0);
     const totalSavings = enrichedAccounts.filter(a => a.type === 'SAVINGS').reduce((sum, a) => sum + Number(a.calculated_balance), 0);
 
-    // Credit cards are signed balances: purchases go negative, payments move them toward zero.
-    const netTotal = enrichedAccounts.reduce((sum, a) => sum + Number(a.calculated_balance), 0);
+    const liquidTotal = Number(summary?.liquid_balance ?? totalCash + totalBank);
+    const netTotal = Number(summary?.net_worth ?? enrichedAccounts.reduce((sum, a) => sum + Number(a.calculated_balance), 0));
 
     return (
         <div className="max-w-6xl mx-auto">
@@ -64,10 +64,19 @@ export function AccountsPage() {
             </header>
 
             {/* General Overview */}
-            <div className="grid grid-cols-1 md:grid-cols-6 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-6 lg:grid-cols-7 gap-6 mb-8">
                 <div className="md:col-span-2 bg-gradient-to-r from-brand-700 to-brand-900 text-white rounded-2xl p-6 shadow-sm flex flex-col justify-center">
-                    <h2 className="text-brand-100 font-medium mb-1">Patrimonio Líquido</h2>
+                    <h2 className="text-brand-100 font-medium mb-1">Liquidez disponible</h2>
                     <p className="text-4xl font-bold">
+                        ${liquidTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    </p>
+                </div>
+
+                <div className="bg-[var(--bg-secondary)] rounded-2xl p-6 shadow-sm border border-brand-200">
+                    <div className="flex items-center gap-2 text-[var(--text-secondary)] font-medium mb-2 text-sm">
+                        <Wallet size={18} /> Patrimonio neto
+                    </div>
+                    <p className="text-xl font-bold text-[var(--text-primary)]">
                         ${netTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </p>
                 </div>
