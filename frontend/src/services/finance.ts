@@ -8,6 +8,8 @@ export interface Category {
     icon?: string;
 }
 
+export type SpendingKind = 'NECESSARY' | 'OUTING' | 'IMPULSE' | 'OPTIONAL';
+
 export interface Transaction {
     id: number;
     amount: string;
@@ -19,6 +21,7 @@ export interface Transaction {
     payment_method: 'CASH' | 'CARD' | 'TRANSFER';
     description?: string;
     is_transfer?: boolean;
+    spending_kind?: SpendingKind | null;
 }
 
 export interface TransactionQueryParams {
@@ -80,6 +83,69 @@ export interface Last7DaysExpense {
     categories: SummaryCategoryTotal[];
 }
 
+export interface EmergencyFundStatus {
+    current: string;
+    target: string;
+    percent: string;
+    months: string | null;
+    days_of_freedom: number | null;
+    source: string;
+}
+
+export interface SpendingBehavior {
+    necessary: string;
+    outing: string;
+    impulse: string;
+    optional: string;
+    outing_budget: string;
+    outing_remaining: string;
+    days_without_impulse: number | null;
+}
+
+export interface ImportantPayment {
+    date: string;
+    label: string;
+    amount: string;
+    kind: 'RECURRING' | 'DEBT' | 'CREDIT_CARD' | 'START';
+    balance_after?: string;
+}
+
+export interface NetWorthHistoryPoint {
+    month: string;
+    label: string;
+    net_worth: string;
+    cumulative_change: string;
+}
+
+export interface DebtProgress {
+    id: number;
+    name: string;
+    total_amount: string;
+    remaining_amount: string;
+    paid_amount: string;
+    percent: string;
+    due_date: string | null;
+}
+
+export interface FinancialScore {
+    total: number;
+    components: {
+        liquidity: number;
+        debt: number;
+        savings: number;
+        net_worth: number;
+        discipline: number;
+    };
+}
+
+export interface FinancialLifeSnapshot {
+    age: number | null;
+    weekly_work_hours: number | null;
+    current_goal: string;
+    active_income_sources: number;
+    passive_income_sources: number;
+}
+
 export interface FinanceSummary {
     balance: string;
     total_income: string;
@@ -90,6 +156,19 @@ export interface FinanceSummary {
     credit_card_debt: string;
     credit_available: string;
     net_worth: string;
+    total_debt: string;
+    payable_debt: string;
+    receivable_debt: string;
+    future_liquidity: string;
+    emergency_fund: EmergencyFundStatus;
+    spending_behavior: SpendingBehavior;
+    upcoming_important_payment: ImportantPayment | null;
+    cashflow_projection: ImportantPayment[];
+    net_worth_history: NetWorthHistoryPoint[];
+    debt_progress: DebtProgress[];
+    financial_score: FinancialScore;
+    days_of_freedom: number | null;
+    financial_life: FinancialLifeSnapshot;
     expenses_by_category: SummaryCategoryTotal[];
     incomes_by_category: SummaryCategoryTotal[];
     accounts: SummaryAccount[];
@@ -121,6 +200,15 @@ export interface RecurringExpense {
     due_day: number;
     is_active: boolean;
     last_paid_date: string | null;
+}
+
+export interface FinancialProfile {
+    id: number;
+    age: number | null;
+    emergency_fund_goal: string;
+    monthly_outing_budget: string;
+    weekly_work_hours: number | null;
+    current_goal: string;
 }
 
 export const financeService = {
@@ -257,5 +345,15 @@ export const financeService = {
     sendWhatsAppTest: async (phone: string, apikey: string) => {
         const { data } = await api.post('users/whatsapp-test/', { phone, apikey });
         return data as { message?: string; error?: string };
+    },
+
+    // Financial Profile / behavior settings
+    getFinancialProfile: async () => {
+        const { data } = await api.get('finance/financial-profile/me/');
+        return data as FinancialProfile;
+    },
+    updateFinancialProfile: async (profile: Partial<FinancialProfile>) => {
+        const { data } = await api.patch('finance/financial-profile/me/', profile);
+        return data as FinancialProfile;
     },
 };

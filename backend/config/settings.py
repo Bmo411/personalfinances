@@ -83,16 +83,24 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ.get('DB_NAME') or 'money_management',
-        'USER': os.environ.get('DB_USER') or 'postgres',
-        'PASSWORD': os.environ.get('DB_PASSWORD') or 'password',
-        'HOST': os.environ.get('DB_HOST') or 'localhost',
-        'PORT': os.environ.get('DB_PORT') or '5432',
+if os.environ.get('USE_SQLITE', 'False') == 'True':
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.environ.get('DB_NAME') or 'money_management',
+            'USER': os.environ.get('DB_USER') or 'postgres',
+            'PASSWORD': os.environ.get('DB_PASSWORD') or 'password',
+            'HOST': os.environ.get('DB_HOST') or 'localhost',
+            'PORT': os.environ.get('DB_PORT') or '5432',
+        }
+    }
 
 
 # Password validation

@@ -1,14 +1,15 @@
+import calendar
 import datetime
 from decimal import Decimal, InvalidOperation
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from django.db.models import Sum
+from django.db.models import Q, Sum
 from django.db.models.functions import TruncMonth
 from django.utils.dateparse import parse_date
-from .models import Category, Transaction, SavingsGoal, Debt, Account, RecurringExpense
-from .serializers import CategorySerializer, TransactionSerializer, SavingsGoalSerializer, DebtSerializer, AccountSerializer, RecurringExpenseSerializer
+from .models import Category, Transaction, SavingsGoal, Debt, Account, RecurringExpense, FinancialProfile
+from .serializers import CategorySerializer, TransactionSerializer, SavingsGoalSerializer, DebtSerializer, AccountSerializer, RecurringExpenseSerializer, FinancialProfileSerializer
 
 class CategoryViewSet(viewsets.ModelViewSet):
     serializer_class = CategorySerializer
@@ -42,7 +43,12 @@ class TransactionViewSet(viewsets.ModelViewSet):
         return queryset.order_by('-date', '-created_at')
 
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        spending_kind = serializer.validated_data.get('spending_kind')
+        transaction_type = serializer.validated_data.get('type')
+        if transaction_type == 'OUT' and not spending_kind:
+            serializer.save(user=self.request.user, spending_kind='NECESSARY')
+        else:
+            serializer.save(user=self.request.user)
 
     def perform_destroy(self, instance):
         instance.is_deleted = True
@@ -118,6 +124,46 @@ class TransactionViewSet(viewsets.ModelViewSet):
             
         trend_start, trend_end, period_mode = self._get_summary_period_bounds(request)
         expense_trend = self._build_expense_trend(queryset, trend_start, trend_end)
+        profile, _ = FinancialProfile.objects.get_or_create(user=self.request.user)
+
+        payable_debt = Debt.objects.filter(
+            user=self.request.user,
+            type='I_OWE',
+            is_settled=False,
+        ).aggregate(Sum('remaining_amount'))['remaining_amount__sum'] or Decimal('0.00')
+        receivable_debt = Debt.objects.filter(
+            user=self.request.user,
+            type='OWED_TO_ME',
+            is_settled=False,
+        ).aggregate(Sum('remaining_amount'))['remaining_amount__sum'] or Decimal('0.00')
+        total_debt = payable_debt + credit_card_debt
+        future_liquidity = liquid_balance + receivable_debt
+
+        necessary_spent = queryset.filter(type='OUT', is_transfer=False).filter(
+            Q(spending_kind='NECESSARY') | Q(spending_kind__isnull=True) | Q(spending_kind='')
+        ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0.00')
+        outing_spent = queryset.filter(type='OUT', is_transfer=False, spending_kind='OUTING').aggregate(Sum('amount'))['amount__sum'] or Decimal('0.00')
+        impulse_spent = queryset.filter(type='OUT', is_transfer=False, spending_kind='IMPULSE').aggregate(Sum('amount'))['amount__sum'] or Decimal('0.00')
+        optional_spent = queryset.filter(type='OUT', is_transfer=False, spending_kind='OPTIONAL').aggregate(Sum('amount'))['amount__sum'] or Decimal('0.00')
+
+        days_of_freedom = self._days_of_freedom(self.request.user, liquid_balance)
+        emergency_fund = self._emergency_fund_status(self.request.user, profile, savings_balance, days_of_freedom)
+        days_without_impulse = self._days_without_impulse(self.request.user, today)
+        upcoming_payment = self._next_important_payment(self.request.user, today)
+        cashflow_projection = self._cashflow_projection(self.request.user, today, liquid_balance)
+        net_worth_history = self._net_worth_history(self.request.user, today)
+        debt_progress = self._debt_progress(self.request.user)
+        financial_score = self._financial_score(
+            liquid_balance=liquid_balance,
+            net_worth=net_worth,
+            total_debt=total_debt,
+            total_income=Decimal(str(incomes)),
+            total_expense=Decimal(str(expenses)),
+            emergency_percent=emergency_fund['percent'],
+            impulse_spent=impulse_spent,
+            days_without_impulse=days_without_impulse,
+            days_of_freedom=days_of_freedom,
+        )
             
         return Response({
             'balance': incomes - expenses,
@@ -129,6 +175,33 @@ class TransactionViewSet(viewsets.ModelViewSet):
             'credit_card_debt': credit_card_debt,
             'credit_available': credit_available,
             'net_worth': net_worth,
+            'total_debt': total_debt,
+            'payable_debt': payable_debt,
+            'receivable_debt': receivable_debt,
+            'future_liquidity': future_liquidity,
+            'emergency_fund': emergency_fund,
+            'spending_behavior': {
+                'necessary': necessary_spent,
+                'outing': outing_spent,
+                'impulse': impulse_spent,
+                'optional': optional_spent,
+                'outing_budget': profile.monthly_outing_budget,
+                'outing_remaining': profile.monthly_outing_budget - outing_spent,
+                'days_without_impulse': days_without_impulse,
+            },
+            'upcoming_important_payment': upcoming_payment,
+            'cashflow_projection': cashflow_projection,
+            'net_worth_history': net_worth_history,
+            'debt_progress': debt_progress,
+            'financial_score': financial_score,
+            'days_of_freedom': days_of_freedom,
+            'financial_life': {
+                'age': profile.age,
+                'weekly_work_hours': profile.weekly_work_hours,
+                'current_goal': profile.current_goal,
+                'active_income_sources': queryset.filter(type='IN', is_transfer=False).values('category_id').distinct().count(),
+                'passive_income_sources': 0,
+            },
             'expenses_by_category': list(expenses_by_category),
             'incomes_by_category': list(incomes_by_category),
             'accounts': accounts_data,
@@ -215,6 +288,303 @@ class TransactionViewSet(viewsets.ModelViewSet):
             for item in monthly
         ]
 
+    def _emergency_fund_status(self, user, profile, savings_balance, days_of_freedom):
+        emergency_goal = SavingsGoal.objects.filter(user=user, name__icontains='emerg').order_by('-created_at').first()
+
+        if emergency_goal:
+            current = emergency_goal.current_amount
+            target = emergency_goal.target_amount
+            source = emergency_goal.name
+        else:
+            current = max(Decimal('0.00'), savings_balance)
+            target = profile.emergency_fund_goal
+            source = 'Ahorro e inversiones'
+
+        percent = Decimal('0.00')
+        if target and target > Decimal('0.00'):
+            percent = min(Decimal('100.00'), (current / target) * Decimal('100.00'))
+
+        monthly_burn = self._average_monthly_expense(user)
+        months = None
+        if monthly_burn > Decimal('0.00'):
+            months = current / monthly_burn
+
+        return {
+            'current': current,
+            'target': target,
+            'percent': percent,
+            'months': months,
+            'days_of_freedom': days_of_freedom,
+            'source': source,
+        }
+
+    def _average_monthly_expense(self, user):
+        today = datetime.date.today()
+        start = today - datetime.timedelta(days=89)
+        total = Transaction.objects.filter(
+            user=user,
+            is_deleted=False,
+            type='OUT',
+            is_transfer=False,
+            date__gte=start,
+            date__lte=today,
+        ).aggregate(Sum('amount'))['amount__sum'] or Decimal('0.00')
+
+        return (total / Decimal('90.00')) * Decimal('30.00')
+
+    def _days_of_freedom(self, user, liquid_balance):
+        monthly_burn = self._average_monthly_expense(user)
+        daily_burn = monthly_burn / Decimal('30.00') if monthly_burn else Decimal('0.00')
+
+        if daily_burn <= Decimal('0.00'):
+            return None
+
+        return max(0, int(liquid_balance / daily_burn))
+
+    def _days_without_impulse(self, user, today):
+        latest = Transaction.objects.filter(
+            user=user,
+            is_deleted=False,
+            type='OUT',
+            is_transfer=False,
+            spending_kind='IMPULSE',
+        ).order_by('-date').first()
+
+        if not latest:
+            return None
+
+        return max(0, (today - latest.date).days)
+
+    def _next_important_payment(self, user, today):
+        events = self._upcoming_cash_events(user, today, days=45)
+        return events[0] if events else None
+
+    def _cashflow_projection(self, user, today, liquid_balance):
+        events = self._upcoming_cash_events(user, today, days=45)
+        points = [{
+            'date': today.strftime('%Y-%m-%d'),
+            'label': 'Hoy',
+            'amount': Decimal('0.00'),
+            'balance_after': liquid_balance,
+            'kind': 'START',
+        }]
+
+        running_balance = liquid_balance
+        for event in events[:8]:
+            running_balance -= event['amount']
+            points.append({
+                **event,
+                'balance_after': running_balance,
+            })
+
+        return points
+
+    def _upcoming_cash_events(self, user, today, days=45):
+        end = today + datetime.timedelta(days=days)
+        events = []
+
+        recurring_expenses = RecurringExpense.objects.filter(user=user, is_active=True)
+        for expense in recurring_expenses:
+            due_date = self._next_date_for_day(expense.due_day, today)
+            if not due_date or due_date > end:
+                continue
+
+            if expense.last_paid_date and expense.last_paid_date.year == due_date.year and expense.last_paid_date.month == due_date.month:
+                continue
+
+            events.append({
+                'date': due_date.strftime('%Y-%m-%d'),
+                'label': expense.name,
+                'amount': expense.amount,
+                'kind': 'RECURRING',
+            })
+
+        debts = Debt.objects.filter(user=user, type='I_OWE', is_settled=False, due_date__gte=today, due_date__lte=end)
+        for debt in debts:
+            events.append({
+                'date': debt.due_date.strftime('%Y-%m-%d'),
+                'label': debt.name,
+                'amount': debt.remaining_amount,
+                'kind': 'DEBT',
+            })
+
+        cards = Account.objects.filter(user=user, is_active=True, type='CREDIT', payment_due_day__isnull=False)
+        for card in cards:
+            debt = self._credit_card_debt(user, card)
+            if debt <= Decimal('0.00'):
+                continue
+
+            due_date = self._next_date_for_day(card.payment_due_day, today)
+            if due_date and due_date <= end:
+                events.append({
+                    'date': due_date.strftime('%Y-%m-%d'),
+                    'label': card.name,
+                    'amount': debt,
+                    'kind': 'CREDIT_CARD',
+                })
+
+        return sorted(events, key=lambda item: item['date'])
+
+    def _next_date_for_day(self, day, today):
+        if not day:
+            return None
+
+        current_month_date = self._date_for_day(today.year, today.month, day)
+        if current_month_date >= today:
+            return current_month_date
+
+        return self._date_for_day(today.year, today.month + 1, day)
+
+    def _date_for_day(self, year, month, day):
+        year += (month - 1) // 12
+        month = ((month - 1) % 12) + 1
+        last_day = calendar.monthrange(year, month)[1]
+        return datetime.date(year, month, min(day, last_day))
+
+    def _credit_card_debt(self, user, card):
+        card_txs = Transaction.objects.filter(user=user, is_deleted=False, account=card)
+        incomes = card_txs.filter(type='IN').aggregate(Sum('amount'))['amount__sum'] or Decimal('0.00')
+        expenses = card_txs.filter(type='OUT').aggregate(Sum('amount'))['amount__sum'] or Decimal('0.00')
+        calculated_balance = card.balance + incomes - expenses
+        return max(Decimal('0.00'), -calculated_balance)
+
+    def _net_worth_history(self, user, today):
+        month_names = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+        first_tx = Transaction.objects.filter(user=user, is_deleted=False).order_by('date').first()
+
+        start_year = today.year
+        start_month = today.month - 5
+        while start_month <= 0:
+            start_month += 12
+            start_year -= 1
+
+        if first_tx:
+            first_month = datetime.date(first_tx.date.year, first_tx.date.month, 1)
+            default_start = datetime.date(start_year, start_month, 1)
+            if first_month > default_start:
+                start_year = first_month.year
+                start_month = first_month.month
+
+        months = []
+        year = start_year
+        month = start_month
+        while datetime.date(year, month, 1) <= datetime.date(today.year, today.month, 1):
+            months.append((year, month))
+            month += 1
+            if month > 12:
+                month = 1
+                year += 1
+
+        months = months[-12:]
+        history = []
+        first_value = None
+        for year, month in months:
+            last_day = calendar.monthrange(year, month)[1]
+            end_date = datetime.date(year, month, last_day)
+            value = self._net_worth_at(user, end_date)
+            if first_value is None:
+                first_value = value
+            history.append({
+                'month': f'{year}-{month:02d}',
+                'label': month_names[month - 1],
+                'net_worth': value,
+                'cumulative_change': value - first_value,
+            })
+
+        return history
+
+    def _net_worth_at(self, user, end_date):
+        net_worth = Decimal('0.00')
+        accounts = Account.objects.filter(user=user, created_at__date__lte=end_date)
+
+        for account in accounts:
+            account_txs = Transaction.objects.filter(user=user, is_deleted=False, account=account, date__lte=end_date)
+            incomes = account_txs.filter(type='IN').aggregate(Sum('amount'))['amount__sum'] or Decimal('0.00')
+            expenses = account_txs.filter(type='OUT').aggregate(Sum('amount'))['amount__sum'] or Decimal('0.00')
+            net_worth += account.balance + incomes - expenses
+
+        return net_worth
+
+    def _debt_progress(self, user):
+        debts = Debt.objects.filter(user=user, type='I_OWE', is_settled=False).order_by('due_date', '-created_at')
+        progress = []
+
+        for debt in debts[:5]:
+            paid = debt.total_amount - debt.remaining_amount
+            percent = Decimal('0.00')
+            if debt.total_amount > Decimal('0.00'):
+                percent = min(Decimal('100.00'), (paid / debt.total_amount) * Decimal('100.00'))
+
+            progress.append({
+                'id': debt.id,
+                'name': debt.name,
+                'total_amount': debt.total_amount,
+                'remaining_amount': debt.remaining_amount,
+                'paid_amount': paid,
+                'percent': percent,
+                'due_date': debt.due_date.strftime('%Y-%m-%d') if debt.due_date else None,
+            })
+
+        return progress
+
+    def _financial_score(self, liquid_balance, net_worth, total_debt, total_income, total_expense, emergency_percent, impulse_spent, days_without_impulse, days_of_freedom):
+        liquidity = self._threshold_score(days_of_freedom or 0, [7, 15, 30, 60, 90])
+        savings = self._threshold_score(float(emergency_percent), [10, 25, 50, 75, 100])
+
+        if total_debt <= Decimal('0.00'):
+            debt = 5
+        elif total_income <= Decimal('0.00'):
+            debt = 1
+        else:
+            debt_ratio = total_debt / max(total_income, Decimal('1.00'))
+            if debt_ratio <= Decimal('1.00'):
+                debt = 4
+            elif debt_ratio <= Decimal('3.00'):
+                debt = 3
+            elif debt_ratio <= Decimal('6.00'):
+                debt = 2
+            else:
+                debt = 1
+
+        if net_worth >= Decimal('0.00'):
+            net_worth_score = self._threshold_score(float(net_worth), [1, 5000, 15000, 50000, 100000])
+        else:
+            net_worth_score = 1 if net_worth < Decimal('-10000.00') else 2
+
+        if total_expense <= Decimal('0.00'):
+            discipline = 4
+        else:
+            impulse_ratio = impulse_spent / max(total_expense, Decimal('1.00'))
+            discipline = 5
+            if impulse_ratio > Decimal('0.05'):
+                discipline -= 1
+            if impulse_ratio > Decimal('0.15'):
+                discipline -= 1
+            if days_without_impulse is not None and days_without_impulse < 7:
+                discipline -= 1
+            discipline = max(1, discipline)
+
+        components = {
+            'liquidity': liquidity,
+            'debt': debt,
+            'savings': savings,
+            'net_worth': net_worth_score,
+            'discipline': discipline,
+        }
+        total = round((sum(components.values()) / 25) * 100)
+
+        return {
+            'total': total,
+            'components': components,
+        }
+
+    def _threshold_score(self, value, thresholds):
+        score = 0
+        for threshold in thresholds:
+            if value >= threshold:
+                score += 1
+        return max(1, min(5, score))
+
     @action(detail=False, methods=['post'])
     def transfer(self, request):
         from_account_id = request.data.get('from_account')
@@ -230,10 +600,10 @@ class TransactionViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Cannot transfer to the same account'}, status=400)
 
         try:
-            amount = float(amount)
-            if amount <= 0:
+            amount = Decimal(str(amount))
+            if amount <= Decimal('0.00'):
                 return Response({'error': 'Amount must be positive'}, status=400)
-        except ValueError:
+        except (InvalidOperation, ValueError):
             return Response({'error': 'Invalid amount'}, status=400)
 
         user = self.request.user
@@ -295,10 +665,10 @@ class SavingsGoalViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Amount must be provided'}, status=400)
             
         try:
-            amount = float(amount)
-            if amount <= 0:
+            amount = Decimal(str(amount))
+            if amount <= Decimal('0.00'):
                 return Response({'error': 'Amount must be positive'}, status=400)
-        except ValueError:
+        except (InvalidOperation, ValueError):
             return Response({'error': 'Invalid amount'}, status=400)
             
         goal.current_amount += amount
@@ -331,10 +701,10 @@ class SavingsGoalViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Amount must be provided'}, status=400)
             
         try:
-            amount = float(amount)
-            if amount <= 0:
+            amount = Decimal(str(amount))
+            if amount <= Decimal('0.00'):
                 return Response({'error': 'Amount must be positive'}, status=400)
-        except ValueError:
+        except (InvalidOperation, ValueError):
             return Response({'error': 'Invalid amount'}, status=400)
             
         if amount > goal.current_amount:
@@ -381,13 +751,13 @@ class DebtViewSet(viewsets.ModelViewSet):
             return Response({'error': 'amount and account_id are required'}, status=400)
             
         try:
-            amount = float(amount)
-            if amount <= 0:
+            amount = Decimal(str(amount))
+            if amount <= Decimal('0.00'):
                 return Response({'error': 'Amount must be positive'}, status=400)
-        except ValueError:
+        except (InvalidOperation, ValueError):
             return Response({'error': 'Invalid amount'}, status=400)
             
-        if amount > float(debt.remaining_amount):
+        if amount > debt.remaining_amount:
             return Response({'error': 'Amount exceeds remaining debt'}, status=400)
             
         account = Account.objects.filter(id=account_id, user=request.user).first()
@@ -395,9 +765,9 @@ class DebtViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Account not found'}, status=404)
             
         # Update debt
-        new_remaining = float(debt.remaining_amount) - amount
+        new_remaining = debt.remaining_amount - amount
         debt.remaining_amount = new_remaining
-        if new_remaining <= 0:
+        if new_remaining <= Decimal('0.00'):
             debt.is_settled = True
         debt.save()
         
@@ -415,7 +785,8 @@ class DebtViewSet(viewsets.ModelViewSet):
             date=datetime.date.today(),
             description=desc,
             payment_method='TRANSFER', # Defaulting to TRANSFER, or we could pass it from frontend
-            category=None
+            category=None,
+            spending_kind='NECESSARY' if tx_type == 'OUT' else None,
         )
         
         # We don't update account.balance directly if it's dynamically calculated in summary, 
@@ -510,6 +881,7 @@ class RecurringExpenseViewSet(viewsets.ModelViewSet):
             date=request.data.get('date') or datetime.date.today(),
             description=f'Pago automatizado: {expense.name}',
             payment_method='TRANSFER', # Default assume electronic
+            spending_kind='NECESSARY',
         )
         
         # Update the expense
@@ -517,3 +889,18 @@ class RecurringExpenseViewSet(viewsets.ModelViewSet):
         expense.save()
         
         return Response(RecurringExpenseSerializer(expense).data)
+
+class FinancialProfileViewSet(viewsets.ViewSet):
+    permission_classes = [IsAuthenticated]
+
+    @action(detail=False, methods=['get', 'patch'])
+    def me(self, request):
+        profile, _ = FinancialProfile.objects.get_or_create(user=request.user)
+
+        if request.method.lower() == 'patch':
+            serializer = FinancialProfileSerializer(profile, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save(user=request.user)
+            return Response(serializer.data)
+
+        return Response(FinancialProfileSerializer(profile).data)

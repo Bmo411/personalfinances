@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { financeService } from '../../services/finance';
-import { PlusCircle, Target, Loader2, ArrowRight } from 'lucide-react';
+import { PlusCircle, Target, Loader2, ArrowRight, ShieldCheck } from 'lucide-react';
 import { Modal } from '../../components/ui/Modal';
 import { AccountSelector } from '../../components/transactions/AccountSelector';
 
@@ -10,6 +10,7 @@ export function SavingsPage() {
     const [isAddFundsModalOpen, setIsAddFundsModalOpen] = useState(false);
     const [isWithdrawFundsModalOpen, setIsWithdrawFundsModalOpen] = useState(false);
     const [selectedGoalId, setSelectedGoalId] = useState<number | null>(null);
+    const queryClient = useQueryClient();
 
     const { data: goals = [], isLoading } = useQuery({
         queryKey: ['savings'],
@@ -45,6 +46,24 @@ export function SavingsPage() {
     }, 0);
 
     const savingsAccounts = enrichedAccounts.filter(a => a.type === 'SAVINGS');
+    const emergencyGoal = goals.find(goal => goal.name.toLowerCase().includes('emerg'));
+    const emergencyTarget = Number(summary?.emergency_fund?.target || 30000);
+    const emergencyCurrent = Number(emergencyGoal?.current_amount || summary?.emergency_fund?.current || 0);
+    const emergencyPercent = emergencyTarget > 0 ? Math.min(100, (emergencyCurrent / emergencyTarget) * 100) : 0;
+
+    const createEmergencyMutation = useMutation({
+        mutationFn: () => financeService.createSavingsGoal({
+            name: 'Fondo de emergencia',
+            target_amount: String(emergencyTarget || 30000),
+            color: '#16a34a',
+        }),
+        onSuccess: (goal) => {
+            queryClient.invalidateQueries({ queryKey: ['savings'] });
+            queryClient.invalidateQueries({ queryKey: ['summary'] });
+            setSelectedGoalId(goal.id);
+            setIsAddFundsModalOpen(true);
+        }
+    });
 
     return (
         <div className="max-w-6xl mx-auto">
@@ -64,6 +83,50 @@ export function SavingsPage() {
                     Nueva Meta
                 </button>
             </header>
+
+            <div className="bg-[var(--bg-secondary)] rounded-2xl p-6 shadow-sm border border-green-200 mb-8">
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
+                    <div className="flex items-start gap-4">
+                        <div className="p-3 bg-green-50 rounded-xl text-green-700">
+                            <ShieldCheck size={28} />
+                        </div>
+                        <div>
+                            <h2 className="text-xl font-bold text-[var(--text-primary)]">Fondo de emergencia</h2>
+                            <p className="text-sm text-[var(--text-secondary)] mt-1">
+                                Aparta dinero para cubrir imprevistos sin tocar tarjetas ni deuda.
+                            </p>
+                        </div>
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={() => {
+                            if (emergencyGoal) {
+                                setSelectedGoalId(emergencyGoal.id);
+                                setIsAddFundsModalOpen(true);
+                                return;
+                            }
+                            createEmergencyMutation.mutate();
+                        }}
+                        disabled={createEmergencyMutation.isPending}
+                        className="h-12 px-5 rounded-xl bg-green-600 hover:bg-green-700 text-white font-medium flex items-center justify-center gap-2 disabled:opacity-60"
+                    >
+                        {createEmergencyMutation.isPending ? <Loader2 className="animate-spin" size={18} /> : <ArrowRight size={18} />}
+                        {emergencyGoal ? 'Aportar al fondo' : 'Crear y aportar'}
+                    </button>
+                </div>
+
+                <div className="mt-5">
+                    <div className="h-3 w-full bg-green-50 rounded-full overflow-hidden">
+                        <div className="h-full bg-green-600 rounded-full transition-all" style={{ width: `${emergencyPercent}%` }} />
+                    </div>
+                    <div className="flex justify-between gap-3 mt-2 text-sm text-[var(--text-secondary)]">
+                        <span>${emergencyCurrent.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                        <span>{emergencyPercent.toFixed(0)}%</span>
+                        <span>${emergencyTarget.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                </div>
+            </div>
 
             {/* Resumen Superior */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">

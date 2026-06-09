@@ -24,6 +24,12 @@ class Transaction(models.Model):
         ('CARD', 'Tarjeta'), 
         ('TRANSFER', 'Transferencia')
     )
+    SPENDING_KIND_CHOICES = (
+        ('NECESSARY', 'Necesario'),
+        ('OUTING', 'Salida'),
+        ('IMPULSE', 'Impulsivo'),
+        ('OPTIONAL', 'Opcional'),
+    )
     
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='transactions')
     account = models.ForeignKey('Account', on_delete=models.SET_NULL, null=True, blank=True, related_name='transactions')
@@ -35,6 +41,7 @@ class Transaction(models.Model):
     subcategory = models.CharField(max_length=100, blank=True, null=True)
     description = models.TextField(blank=True, null=True)
     payment_method = models.CharField(max_length=10, choices=METHOD_CHOICES)
+    spending_kind = models.CharField(max_length=12, choices=SPENDING_KIND_CHOICES, blank=True, null=True)
     
     is_transfer = models.BooleanField(default=False)
     is_deleted = models.BooleanField(default=False)
@@ -138,3 +145,17 @@ class RecurringExpense(models.Model):
     
     def __str__(self):
         return f"{self.name} - ${self.amount} (Day {self.due_day})"
+
+class FinancialProfile(models.Model):
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='financial_profile')
+    age = models.PositiveSmallIntegerField(null=True, blank=True)
+    emergency_fund_goal = models.DecimalField(max_digits=12, decimal_places=2, default=30000.00)
+    monthly_outing_budget = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    weekly_work_hours = models.PositiveSmallIntegerField(null=True, blank=True)
+    current_goal = models.CharField(max_length=150, default='Eliminar deudas')
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Financial profile: {self.user}"

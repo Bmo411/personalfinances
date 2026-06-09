@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useThemeStore } from '../../store/themeStore';
-import { Palette, Moon, Sun, MonitorSmartphone, MessageCircle, KeyRound, Phone, HelpCircle, Send, CheckCircle2, XCircle, Loader2, X } from 'lucide-react';
+import { Palette, Moon, Sun, MonitorSmartphone, MessageCircle, KeyRound, Phone, HelpCircle, Send, CheckCircle2, XCircle, Loader2, X, Target, PiggyBank, Clock, UserRound } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { financeService } from '../../services/finance';
 
@@ -89,6 +89,17 @@ export function PreferencesPage() {
     const [localApiKey, setLocalApiKey] = useState<string>('');
     const [localEnabled, setLocalEnabled] = useState<boolean>(false);
     const [synced, setSynced] = useState(false);
+    const [financialSynced, setFinancialSynced] = useState(false);
+    const [localEmergencyGoal, setLocalEmergencyGoal] = useState('30000.00');
+    const [localOutingBudget, setLocalOutingBudget] = useState('0.00');
+    const [localAge, setLocalAge] = useState('');
+    const [localWeeklyHours, setLocalWeeklyHours] = useState('');
+    const [localCurrentGoal, setLocalCurrentGoal] = useState('Eliminar deudas');
+
+    const { data: financialProfile } = useQuery({
+        queryKey: ['financialProfile'],
+        queryFn: financeService.getFinancialProfile,
+    });
 
     // Sync once profile loads
     if (profile && !synced) {
@@ -96,6 +107,15 @@ export function PreferencesPage() {
         setLocalApiKey(profile.whatsapp_apikey || '');
         setLocalEnabled(profile.whatsapp_enabled);
         setSynced(true);
+    }
+
+    if (financialProfile && !financialSynced) {
+        setLocalEmergencyGoal(financialProfile.emergency_fund_goal || '30000.00');
+        setLocalOutingBudget(financialProfile.monthly_outing_budget || '0.00');
+        setLocalAge(financialProfile.age ? String(financialProfile.age) : '');
+        setLocalWeeklyHours(financialProfile.weekly_work_hours ? String(financialProfile.weekly_work_hours) : '');
+        setLocalCurrentGoal(financialProfile.current_goal || 'Eliminar deudas');
+        setFinancialSynced(true);
     }
 
     const saveMutation = useMutation({
@@ -111,6 +131,24 @@ export function PreferencesPage() {
             whatsapp_phone: localPhone || null,
             whatsapp_apikey: localApiKey || null,
             whatsapp_enabled: localEnabled,
+        });
+    };
+
+    const financialSaveMutation = useMutation({
+        mutationFn: financeService.updateFinancialProfile,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['financialProfile'] });
+            queryClient.invalidateQueries({ queryKey: ['summary'] });
+        }
+    });
+
+    const handleFinancialSave = () => {
+        financialSaveMutation.mutate({
+            emergency_fund_goal: localEmergencyGoal || '0.00',
+            monthly_outing_budget: localOutingBudget || '0.00',
+            age: localAge ? Number(localAge) : null,
+            weekly_work_hours: localWeeklyHours ? Number(localWeeklyHours) : null,
+            current_goal: localCurrentGoal || 'Eliminar deudas',
         });
     };
 
@@ -151,6 +189,13 @@ export function PreferencesPage() {
         localPhone !== (profile.whatsapp_phone || '') ||
         localApiKey !== (profile.whatsapp_apikey || '') ||
         localEnabled !== profile.whatsapp_enabled
+    );
+    const isFinancialDirty = financialProfile && (
+        localEmergencyGoal !== (financialProfile.emergency_fund_goal || '30000.00') ||
+        localOutingBudget !== (financialProfile.monthly_outing_budget || '0.00') ||
+        localAge !== (financialProfile.age ? String(financialProfile.age) : '') ||
+        localWeeklyHours !== (financialProfile.weekly_work_hours ? String(financialProfile.weekly_work_hours) : '') ||
+        localCurrentGoal !== (financialProfile.current_goal || 'Eliminar deudas')
     );
 
     return (
@@ -218,6 +263,91 @@ export function PreferencesPage() {
                             </div>
                         </button>
                     </div>
+                </div>
+            </div>
+
+            {/* Financial Goals */}
+            <div className="bg-[var(--bg-secondary)] rounded-2xl p-6 shadow-sm border border-brand-200">
+                <div className="flex items-center gap-3 mb-6">
+                    <Target className="text-brand-700" size={24} />
+                    <h2 className="text-xl font-semibold text-[var(--text-primary)]">Metas y presupuestos</h2>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <label className="space-y-2">
+                        <span className="text-sm font-medium text-[var(--text-secondary)] flex items-center gap-2">
+                            <PiggyBank size={16} /> Meta fondo de emergencia
+                        </span>
+                        <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={localEmergencyGoal}
+                            onChange={(event) => setLocalEmergencyGoal(event.target.value)}
+                            className="w-full px-4 py-3 rounded-xl border border-brand-200 bg-[var(--bg-main)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-brand-500"
+                        />
+                    </label>
+
+                    <label className="space-y-2">
+                        <span className="text-sm font-medium text-[var(--text-secondary)] flex items-center gap-2">
+                            <Target size={16} /> Presupuesto mensual para salidas
+                        </span>
+                        <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={localOutingBudget}
+                            onChange={(event) => setLocalOutingBudget(event.target.value)}
+                            className="w-full px-4 py-3 rounded-xl border border-brand-200 bg-[var(--bg-main)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-brand-500"
+                        />
+                    </label>
+
+                    <label className="space-y-2">
+                        <span className="text-sm font-medium text-[var(--text-secondary)] flex items-center gap-2">
+                            <UserRound size={16} /> Edad
+                        </span>
+                        <input
+                            type="number"
+                            min="0"
+                            value={localAge}
+                            onChange={(event) => setLocalAge(event.target.value)}
+                            className="w-full px-4 py-3 rounded-xl border border-brand-200 bg-[var(--bg-main)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-brand-500"
+                        />
+                    </label>
+
+                    <label className="space-y-2">
+                        <span className="text-sm font-medium text-[var(--text-secondary)] flex items-center gap-2">
+                            <Clock size={16} /> Horas trabajadas por semana
+                        </span>
+                        <input
+                            type="number"
+                            min="0"
+                            value={localWeeklyHours}
+                            onChange={(event) => setLocalWeeklyHours(event.target.value)}
+                            className="w-full px-4 py-3 rounded-xl border border-brand-200 bg-[var(--bg-main)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-brand-500"
+                        />
+                    </label>
+
+                    <label className="space-y-2 md:col-span-2">
+                        <span className="text-sm font-medium text-[var(--text-secondary)]">Meta actual</span>
+                        <input
+                            type="text"
+                            value={localCurrentGoal}
+                            onChange={(event) => setLocalCurrentGoal(event.target.value)}
+                            className="w-full px-4 py-3 rounded-xl border border-brand-200 bg-[var(--bg-main)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-brand-500"
+                            placeholder="Eliminar deudas"
+                        />
+                    </label>
+                </div>
+
+                <div className="flex justify-end mt-5">
+                    <button
+                        onClick={handleFinancialSave}
+                        disabled={!isFinancialDirty || financialSaveMutation.isPending}
+                        className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-brand-700 hover:bg-brand-900 text-white text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                        {financialSaveMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : 'Guardar metas'}
+                    </button>
                 </div>
             </div>
 

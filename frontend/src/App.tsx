@@ -4,6 +4,7 @@ import { ProtectedRoute } from './components/layout/ProtectedRoute';
 import { Login } from './pages/auth/Login'
 import { Register } from './pages/auth/Register'
 import { Dashboard } from './pages/dashboard/Dashboard'
+import { FinancialLifePage } from './pages/financial-life/FinancialLifePage';
 import { PreferencesPage } from './pages/preferences/PreferencesPage';
 import { AccountsPage } from './pages/accounts/AccountsPage';
 import { CreditCardsPage } from './pages/credit-cards/CreditCardsPage';
@@ -24,6 +25,7 @@ function App() {
       <Route element={<ProtectedRoute />}>
         <Route element={<MainLayout />}>
           <Route path="/" element={<Dashboard />} />
+          <Route path="/financial-life" element={<FinancialLifePage />} />
           <Route path="/preferences" element={<PreferencesPage />} />
           <Route path="/accounts" element={<AccountsPage />} />
           <Route path="/credit-cards" element={<CreditCardsPage />} />

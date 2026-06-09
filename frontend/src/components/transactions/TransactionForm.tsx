@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { financeService } from '../../services/finance';
+import type { SpendingKind } from '../../services/finance';
 import { CategorySelector } from './CategorySelector';
 import { AccountSelector } from './AccountSelector';
 import { Loader2 } from 'lucide-react';
@@ -13,6 +14,13 @@ type TransferPayload = Parameters<typeof financeService.createTransfer>[0];
 type TransactionPayload = Parameters<typeof financeService.createTransaction>[0];
 type TransactionMutationPayload = TransferPayload | TransactionPayload;
 
+const spendingOptions: { value: SpendingKind; label: string; description: string }[] = [
+    { value: 'NECESSARY', label: 'Necesario', description: 'Renta, comida, salud, transporte' },
+    { value: 'OUTING', label: 'Salida', description: 'Planes, cenas, cafe, ocio social' },
+    { value: 'IMPULSE', label: 'Impulso', description: 'Compra no planeada' },
+    { value: 'OPTIONAL', label: 'Opcional', description: 'Gusto planeado' },
+];
+
 export function TransactionForm({ onSuccess }: TransactionFormProps) {
     const [type, setType] = useState<'IN' | 'OUT' | 'TRANSFER'>('OUT');
     const [amount, setAmount] = useState('');
@@ -20,6 +28,7 @@ export function TransactionForm({ onSuccess }: TransactionFormProps) {
     const [accountId, setAccountId] = useState<number | null>(null);
     const [toAccountId, setToAccountId] = useState<number | null>(null);
     const [categoryId, setCategoryId] = useState<number | null>(null);
+    const [spendingKind, setSpendingKind] = useState<SpendingKind>('NECESSARY');
     const [description, setDescription] = useState('');
 
     const queryClient = useQueryClient();
@@ -57,6 +66,7 @@ export function TransactionForm({ onSuccess }: TransactionFormProps) {
                 category: categoryId,
                 description,
                 payment_method: 'CASH', // Default for now, can be expanded
+                spending_kind: type === 'OUT' ? spendingKind : null,
             });
         }
     };
@@ -154,6 +164,28 @@ export function TransactionForm({ onSuccess }: TransactionFormProps) {
                             onChange={setCategoryId}
                         />
                     </div>
+
+                    {type === 'OUT' && (
+                        <div className="space-y-2">
+                            <label className="block text-sm font-medium text-[var(--text-secondary)]">Tipo de gasto</label>
+                            <div className="grid grid-cols-2 gap-2">
+                                {spendingOptions.map((option) => (
+                                    <button
+                                        key={option.value}
+                                        type="button"
+                                        onClick={() => setSpendingKind(option.value)}
+                                        className={`min-h-20 rounded-xl border px-3 py-2 text-left transition-colors ${spendingKind === option.value
+                                            ? 'border-brand-700 bg-brand-50 text-brand-900'
+                                            : 'border-brand-200 bg-[var(--bg-main)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
+                                            }`}
+                                    >
+                                        <span className="block text-sm font-semibold">{option.label}</span>
+                                        <span className="block text-xs mt-1 leading-snug">{option.description}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </>
             )}
 

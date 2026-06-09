@@ -19,7 +19,7 @@ from django.urls import path, include
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from users.views import RegisterView, UserProfileView, WhatsAppTestView
 from rest_framework.routers import DefaultRouter
-from finance.views import CategoryViewSet, TransactionViewSet, SavingsGoalViewSet, DebtViewSet, AccountViewSet, RecurringExpenseViewSet
+from finance.views import CategoryViewSet, TransactionViewSet, SavingsGoalViewSet, DebtViewSet, AccountViewSet, RecurringExpenseViewSet, FinancialProfileViewSet
 
 router = DefaultRouter()
 router.register(r'categories', CategoryViewSet, basename='category')
@@ -28,6 +28,7 @@ router.register(r'savings', SavingsGoalViewSet, basename='saving')
 router.register(r'debts', DebtViewSet, basename='debt')
 router.register(r'accounts', AccountViewSet, basename='account')
 router.register(r'recurring', RecurringExpenseViewSet, basename='recurring')
+router.register(r'financial-profile', FinancialProfileViewSet, basename='financial-profile')
 
 urlpatterns = [
     path('admin/', admin.site.urls),

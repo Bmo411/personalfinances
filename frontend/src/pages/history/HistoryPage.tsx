@@ -1,12 +1,21 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { financeService } from '../../services/finance';
+import type { SpendingKind } from '../../services/finance';
 import { History, TrendingDown, TrendingUp, Search, Calendar, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
+const spendingLabels: Record<SpendingKind, string> = {
+    NECESSARY: 'Necesario',
+    OUTING: 'Salida',
+    IMPULSE: 'Impulso',
+    OPTIONAL: 'Opcional',
+};
+
 export function HistoryPage() {
     const [filterType, setFilterType] = useState<'ALL' | 'IN' | 'OUT'>('ALL');
+    const [filterSpendingKind, setFilterSpendingKind] = useState<'ALL' | SpendingKind>('ALL');
     const [searchQuery, setSearchQuery] = useState('');
 
     const queryClient = useQueryClient();
@@ -32,6 +41,7 @@ export function HistoryPage() {
 
     const filteredTransactions = transactions.filter(t => {
         if (filterType !== 'ALL' && t.type !== filterType) return false;
+        if (filterSpendingKind !== 'ALL' && t.spending_kind !== filterSpendingKind) return false;
         if (searchQuery) {
             const query = searchQuery.toLowerCase();
             const descMatch = t.description?.toLowerCase().includes(query);
@@ -72,6 +82,18 @@ export function HistoryPage() {
                         <TrendingDown size={16} /> Egresos
                     </button>
                 </div>
+
+                <select
+                    value={filterSpendingKind}
+                    onChange={(event) => setFilterSpendingKind(event.target.value as 'ALL' | SpendingKind)}
+                    className="w-full md:w-48 px-3 py-2 rounded-xl border border-brand-200 bg-[var(--bg-main)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-brand-500"
+                >
+                    <option value="ALL">Todos los gastos</option>
+                    <option value="NECESSARY">Necesario</option>
+                    <option value="OUTING">Salida</option>
+                    <option value="IMPULSE">Impulso</option>
+                    <option value="OPTIONAL">Opcional</option>
+                </select>
 
                 <div className="relative w-full md:w-64">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-brand-400">
@@ -121,6 +143,11 @@ export function HistoryPage() {
                                     <span className="text-xs text-[var(--text-secondary)] flex items-center gap-1">
                                         Pago: {tx.payment_method === 'CASH' ? 'Efectivo' : tx.payment_method === 'CARD' ? 'Tarjeta' : 'Transferencia'}
                                     </span>
+                                    {tx.type === 'OUT' && tx.spending_kind && (
+                                        <span className="text-xs text-[var(--text-secondary)] mt-1">
+                                            Tipo: {spendingLabels[tx.spending_kind]}
+                                        </span>
+                                    )}
                                 </div>
                                 <div className="col-span-3">
                                     <span className="inline-block px-3 py-1 bg-brand-50 text-brand-700 text-xs rounded-full border border-brand-100">
