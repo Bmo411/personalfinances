@@ -7,7 +7,7 @@ from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.db.models import Sum
 
-from finance.models import Account, RecurringExpense, Transaction
+from finance.models import Account, RecurringExpense, RecurringIncome, Transaction
 
 
 User = get_user_model()
@@ -20,6 +20,9 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         today = datetime.date.today()
         self.stdout.write(f'[{today}] Checking WhatsApp notifications...')
+
+        for user in User.objects.filter(is_active=True):
+            self._process_recurring_incomes(user, today)
 
         users = User.objects.filter(
             whatsapp_enabled=True,
@@ -36,6 +39,34 @@ class Command(BaseCommand):
             self._notify_credit_cards(user, today)
 
         self.stdout.write('Done.')
+
+    def _process_recurring_incomes(self, user, today):
+        incomes = RecurringIncome.objects.filter(user=user, is_active=True, auto_create=True)
+
+        for income in incomes:
+            due_date = self._next_date_for_day(income.due_day, today)
+            if not due_date or due_date != today:
+                continue
+
+            if income.last_received_date:
+                received = income.last_received_date
+                if received.month == due_date.month and received.year == due_date.year:
+                    continue
+
+            Transaction.objects.create(
+                user=user,
+                type='IN',
+                account=income.account,
+                category=income.category,
+                amount=income.amount,
+                date=due_date,
+                description=f'Ingreso fijo automatico: {income.name}',
+                payment_method='TRANSFER',
+            )
+
+            income.last_received_date = due_date
+            income.save()
+            self.stdout.write(f'  [AUTO] {user.username} -> recurring income {income.name} (${float(income.amount):,.2f})')
 
     def _notify_recurring_expenses(self, user, today):
         expenses = RecurringExpense.objects.filter(user=user, is_active=True)

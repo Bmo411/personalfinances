@@ -8,8 +8,8 @@ from rest_framework.response import Response
 from django.db.models import Q, Sum
 from django.db.models.functions import TruncMonth
 from django.utils.dateparse import parse_date
-from .models import Category, Transaction, SavingsGoal, Debt, Account, RecurringExpense, FinancialProfile
-from .serializers import CategorySerializer, TransactionSerializer, SavingsGoalSerializer, DebtSerializer, AccountSerializer, RecurringExpenseSerializer, FinancialProfileSerializer
+from .models import Category, Transaction, SavingsGoal, Debt, Account, RecurringExpense, RecurringIncome, FinancialProfile
+from .serializers import CategorySerializer, TransactionSerializer, SavingsGoalSerializer, DebtSerializer, AccountSerializer, RecurringExpenseSerializer, RecurringIncomeSerializer, FinancialProfileSerializer
 
 class CategoryViewSet(viewsets.ModelViewSet):
     serializer_class = CategorySerializer
@@ -121,10 +121,19 @@ class TransactionViewSet(viewsets.ModelViewSet):
             
             # If not paid, consider it upcoming or past due
             upcoming_fixed_expenses += expense.amount
+
+        recurring_incomes = RecurringIncome.objects.filter(user=self.request.user, is_active=True)
+        upcoming_fixed_incomes = 0
+        for income in recurring_incomes:
+            if income.last_received_date and income.last_received_date.year == today.year and income.last_received_date.month == today.month:
+                continue
+
+            upcoming_fixed_incomes += income.amount
             
         trend_start, trend_end, period_mode = self._get_summary_period_bounds(request)
         expense_trend = self._build_expense_trend(queryset, trend_start, trend_end)
         profile, _ = FinancialProfile.objects.get_or_create(user=self.request.user)
+        outing_budget = Decimal(str(profile.monthly_outing_budget or '0.00'))
 
         payable_debt = Debt.objects.filter(
             user=self.request.user,
@@ -185,8 +194,8 @@ class TransactionViewSet(viewsets.ModelViewSet):
                 'outing': outing_spent,
                 'impulse': impulse_spent,
                 'optional': optional_spent,
-                'outing_budget': profile.monthly_outing_budget,
-                'outing_remaining': profile.monthly_outing_budget - outing_spent,
+                'outing_budget': outing_budget,
+                'outing_remaining': outing_budget - outing_spent,
                 'days_without_impulse': days_without_impulse,
             },
             'upcoming_important_payment': upcoming_payment,
@@ -199,13 +208,14 @@ class TransactionViewSet(viewsets.ModelViewSet):
                 'age': profile.age,
                 'weekly_work_hours': profile.weekly_work_hours,
                 'current_goal': profile.current_goal,
-                'active_income_sources': queryset.filter(type='IN', is_transfer=False).values('category_id').distinct().count(),
-                'passive_income_sources': 0,
+                'active_income_sources': recurring_incomes.filter(source_type='ACTIVE').count(),
+                'passive_income_sources': recurring_incomes.filter(source_type='PASSIVE').count(),
             },
             'expenses_by_category': list(expenses_by_category),
             'incomes_by_category': list(incomes_by_category),
             'accounts': accounts_data,
             'upcoming_fixed_expenses': upcoming_fixed_expenses,
+            'upcoming_fixed_incomes': upcoming_fixed_incomes,
             'last_7_days_expenses': expense_trend,
             'expense_trend': expense_trend,
             'period': {
@@ -292,12 +302,12 @@ class TransactionViewSet(viewsets.ModelViewSet):
         emergency_goal = SavingsGoal.objects.filter(user=user, name__icontains='emerg').order_by('-created_at').first()
 
         if emergency_goal:
-            current = emergency_goal.current_amount
-            target = emergency_goal.target_amount
+            current = Decimal(str(emergency_goal.current_amount or '0.00'))
+            target = Decimal(str(emergency_goal.target_amount or '0.00'))
             source = emergency_goal.name
         else:
-            current = max(Decimal('0.00'), savings_balance)
-            target = profile.emergency_fund_goal
+            current = max(Decimal('0.00'), Decimal(str(savings_balance or '0.00')))
+            target = Decimal(str(profile.emergency_fund_goal or '0.00'))
             source = 'Ahorro e inversiones'
 
         percent = Decimal('0.00')
@@ -357,7 +367,8 @@ class TransactionViewSet(viewsets.ModelViewSet):
 
     def _next_important_payment(self, user, today):
         events = self._upcoming_cash_events(user, today, days=45)
-        return events[0] if events else None
+        payments = [event for event in events if event.get('direction', 'OUT') == 'OUT']
+        return payments[0] if payments else None
 
     def _cashflow_projection(self, user, today, liquid_balance):
         events = self._upcoming_cash_events(user, today, days=45)
@@ -371,7 +382,10 @@ class TransactionViewSet(viewsets.ModelViewSet):
 
         running_balance = liquid_balance
         for event in events[:8]:
-            running_balance -= event['amount']
+            if event.get('direction') == 'IN':
+                running_balance += event['amount']
+            else:
+                running_balance -= event['amount']
             points.append({
                 **event,
                 'balance_after': running_balance,
@@ -397,6 +411,24 @@ class TransactionViewSet(viewsets.ModelViewSet):
                 'label': expense.name,
                 'amount': expense.amount,
                 'kind': 'RECURRING',
+                'direction': 'OUT',
+            })
+
+        recurring_incomes = RecurringIncome.objects.filter(user=user, is_active=True)
+        for income in recurring_incomes:
+            due_date = self._next_date_for_day(income.due_day, today)
+            if not due_date or due_date > end:
+                continue
+
+            if income.last_received_date and income.last_received_date.year == due_date.year and income.last_received_date.month == due_date.month:
+                continue
+
+            events.append({
+                'date': due_date.strftime('%Y-%m-%d'),
+                'label': income.name,
+                'amount': income.amount,
+                'kind': 'RECURRING_INCOME',
+                'direction': 'IN',
             })
 
         debts = Debt.objects.filter(user=user, type='I_OWE', is_settled=False, due_date__gte=today, due_date__lte=end)
@@ -406,6 +438,7 @@ class TransactionViewSet(viewsets.ModelViewSet):
                 'label': debt.name,
                 'amount': debt.remaining_amount,
                 'kind': 'DEBT',
+                'direction': 'OUT',
             })
 
         cards = Account.objects.filter(user=user, is_active=True, type='CREDIT', payment_due_day__isnull=False)
@@ -421,6 +454,7 @@ class TransactionViewSet(viewsets.ModelViewSet):
                     'label': card.name,
                     'amount': debt,
                     'kind': 'CREDIT_CARD',
+                    'direction': 'OUT',
                 })
 
         return sorted(events, key=lambda item: item['date'])
@@ -889,6 +923,37 @@ class RecurringExpenseViewSet(viewsets.ModelViewSet):
         expense.save()
         
         return Response(RecurringExpenseSerializer(expense).data)
+
+class RecurringIncomeViewSet(viewsets.ModelViewSet):
+    serializer_class = RecurringIncomeSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return RecurringIncome.objects.filter(user=self.request.user).order_by('due_day', '-created_at')
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+    @action(detail=True, methods=['post'])
+    def receive(self, request, pk=None):
+        income = self.get_object()
+        account_id = request.data.get('account_id') or (income.account.id if income.account else None)
+
+        Transaction.objects.create(
+            user=self.request.user,
+            type='IN',
+            account_id=account_id,
+            category_id=income.category.id if income.category else None,
+            amount=income.amount,
+            date=request.data.get('date') or datetime.date.today(),
+            description=f'Ingreso fijo: {income.name}',
+            payment_method='TRANSFER',
+        )
+
+        income.last_received_date = request.data.get('date') or datetime.date.today()
+        income.save()
+
+        return Response(RecurringIncomeSerializer(income).data)
 
 class FinancialProfileViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]

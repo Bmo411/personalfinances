@@ -14,7 +14,7 @@ const navItems = [
     { icon: Compass, label: 'Mi vida', path: '/financial-life' },
     { icon: Wallet2, label: 'Cuentas', path: '/accounts' },
     { icon: CreditCard, label: 'Tarjetas', path: '/credit-cards' },
-    { icon: CalendarClock, label: 'Gastos Fijos', path: '/recurring' },
+    { icon: CalendarClock, label: 'Fijos', path: '/recurring' },
     { icon: History, label: 'Historial', path: '/history' },
     { icon: PiggyBank, label: 'Categorías', path: '/categories' },
     { icon: Target, label: 'Ahorros', path: '/savings' },

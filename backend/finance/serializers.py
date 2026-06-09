@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Category, Transaction, SavingsGoal, Debt, Account, RecurringExpense, FinancialProfile
+from .models import Category, Transaction, SavingsGoal, Debt, Account, RecurringExpense, RecurringIncome, FinancialProfile
 
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
@@ -37,6 +37,12 @@ class AccountSerializer(serializers.ModelSerializer):
 class RecurringExpenseSerializer(serializers.ModelSerializer):
     class Meta:
         model = RecurringExpense
+        fields = '__all__'
+        read_only_fields = ('user',)
+
+class RecurringIncomeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RecurringIncome
         fields = '__all__'
         read_only_fields = ('user',)
 

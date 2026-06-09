@@ -106,7 +106,7 @@ export function FinancialLifePage() {
                             </p>
                         </div>
                         <div className="bg-[var(--bg-secondary)] border border-brand-200 rounded-2xl p-5 shadow-sm">
-                            <p className="text-sm text-[var(--text-secondary)]">Ingresos activos / pasivos</p>
+                            <p className="text-sm text-[var(--text-secondary)]">Fuentes activas / pasivas</p>
                             <p className="text-2xl font-bold mt-1">
                                 {summary?.financial_life.active_income_sources ?? 0} / {summary?.financial_life.passive_income_sources ?? 0}
                             </p>

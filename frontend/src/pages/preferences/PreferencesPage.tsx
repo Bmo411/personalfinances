@@ -203,14 +203,14 @@ export function PreferencesPage() {
             <h1 className="text-2xl font-bold">Preferencias</h1>
 
             {/* Tema de Interfaz */}
-            <div className="bg-white rounded-2xl p-6 shadow-sm border border-brand-200">
+            <div className="bg-[var(--bg-secondary)] rounded-2xl p-6 shadow-sm border border-brand-200">
                 <div className="flex items-center gap-3 mb-6">
                     <Palette className="text-brand-700" size={24} />
-                    <h2 className="text-xl font-semibold">Tema y Pantalla</h2>
+                    <h2 className="text-xl font-semibold text-[var(--text-primary)]">Tema y Pantalla</h2>
                 </div>
 
                 <div className="space-y-4">
-                    <p className="text-sm text-brand-900/60 mb-4">
+                    <p className="text-sm text-[var(--text-secondary)] mb-4">
                         Personaliza los colores de la aplicación.
                     </p>
 
@@ -218,7 +218,7 @@ export function PreferencesPage() {
                         {/* Verde Pastel Default */}
                         <button
                             onClick={() => setTheme('light')}
-                            className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-2 ${theme === 'light' ? 'border-brand-500 bg-brand-50 shadow-md' : 'border-gray-200 hover:border-brand-400'
+                            className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-2 text-[var(--text-primary)] ${theme === 'light' ? 'border-brand-500 bg-brand-50 shadow-md' : 'border-brand-200 hover:border-brand-400 bg-[var(--bg-main)]'
                                 }`}
                         >
                             <div className="w-12 h-12 rounded-full overflow-hidden flex border border-gray-200 shadow-sm">
@@ -226,7 +226,7 @@ export function PreferencesPage() {
                                 <div className="w-1/2 h-full bg-[#718355]"></div>
                             </div>
                             <span className="font-medium">Original (Verde)</span>
-                            <div className="flex bg-gray-100 rounded-full px-2 py-1 text-xs gap-1 mt-1">
+                            <div className="flex bg-[var(--bg-secondary)] border border-brand-200 rounded-full px-2 py-1 text-xs gap-1 mt-1 text-[var(--text-secondary)]">
                                 <Sun size={14} className="text-yellow-600" /> Claro
                             </div>
                         </button>
@@ -234,7 +234,7 @@ export function PreferencesPage() {
                         {/* Océano */}
                         <button
                             onClick={() => setTheme('ocean')}
-                            className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-2 ${theme === 'ocean' ? 'border-[#38bdf8] bg-[#e0f2fe] shadow-md' : 'border-gray-200 hover:border-[#7dd3fc]'
+                            className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-2 text-[var(--text-primary)] ${theme === 'ocean' ? 'border-[#38bdf8] bg-brand-50 shadow-md' : 'border-brand-200 hover:border-[#7dd3fc] bg-[var(--bg-main)]'
                                 }`}
                         >
                             <div className="w-12 h-12 rounded-full overflow-hidden flex border border-gray-200 shadow-sm">
@@ -242,7 +242,7 @@ export function PreferencesPage() {
                                 <div className="w-1/2 h-full bg-[#0c4a6e]"></div>
                             </div>
                             <span className="font-medium">Océano</span>
-                            <div className="flex bg-gray-100 rounded-full px-2 py-1 text-xs gap-1 mt-1">
+                            <div className="flex bg-[var(--bg-secondary)] border border-brand-200 rounded-full px-2 py-1 text-xs gap-1 mt-1 text-[var(--text-secondary)]">
                                 <Sun size={14} className="text-yellow-600" /> Claro
                             </div>
                         </button>
@@ -250,7 +250,7 @@ export function PreferencesPage() {
                         {/* Oscuro */}
                         <button
                             onClick={() => setTheme('dark')}
-                            className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-2 ${theme === 'dark' ? 'border-[#71a367] bg-[#1a2318] shadow-md text-white' : 'border-gray-200 hover:border-[#598051]'
+                            className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-2 ${theme === 'dark' ? 'border-[#71a367] bg-[#1a2318] shadow-md text-white' : 'border-brand-200 hover:border-[#598051] bg-[var(--bg-main)] text-[var(--text-primary)]'
                                 }`}
                         >
                             <div className="w-12 h-12 rounded-full overflow-hidden flex border border-gray-200 shadow-sm">
@@ -258,7 +258,7 @@ export function PreferencesPage() {
                                 <div className="w-1/2 h-full bg-[#71a367]"></div>
                             </div>
                             <span className="font-medium">Oscuro</span>
-                            <div className="flex bg-gray-100 rounded-full px-2 py-1 text-xs gap-1 mt-1">
+                            <div className="flex bg-[var(--bg-secondary)] border border-brand-200 rounded-full px-2 py-1 text-xs gap-1 mt-1 text-[var(--text-secondary)]">
                                 <Moon size={14} className="text-blue-400" /> Oscuro
                             </div>
                         </button>
@@ -448,12 +448,12 @@ export function PreferencesPage() {
             </div>
 
             {/* Sistema (Placeholder) */}
-            <div className="bg-white rounded-2xl p-6 shadow-sm border border-brand-200 opacity-60">
+            <div className="bg-[var(--bg-secondary)] rounded-2xl p-6 shadow-sm border border-brand-200 opacity-60">
                 <div className="flex items-center gap-3 mb-6">
                     <MonitorSmartphone className="text-brand-700" size={24} />
-                    <h2 className="text-xl font-semibold">Sistema y Visualización</h2>
+                    <h2 className="text-xl font-semibold text-[var(--text-primary)]">Sistema y Visualización</h2>
                 </div>
-                <p className="text-sm italic">Próximamente: Reglas de redondeo, moneda por defecto e idioma.</p>
+                <p className="text-sm italic text-[var(--text-secondary)]">Próximamente: Reglas de redondeo, moneda por defecto e idioma.</p>
             </div>
 
             {showInstructions && <InstructionsModal onClose={() => setShowInstructions(false)} />}

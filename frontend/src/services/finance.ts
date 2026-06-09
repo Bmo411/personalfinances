@@ -106,7 +106,8 @@ export interface ImportantPayment {
     date: string;
     label: string;
     amount: string;
-    kind: 'RECURRING' | 'DEBT' | 'CREDIT_CARD' | 'START';
+    kind: 'RECURRING' | 'RECURRING_INCOME' | 'DEBT' | 'CREDIT_CARD' | 'START';
+    direction?: 'IN' | 'OUT';
     balance_after?: string;
 }
 
@@ -173,6 +174,7 @@ export interface FinanceSummary {
     incomes_by_category: SummaryCategoryTotal[];
     accounts: SummaryAccount[];
     upcoming_fixed_expenses: string;
+    upcoming_fixed_incomes: string;
     last_7_days_expenses: Last7DaysExpense[];
     expense_trend: Last7DaysExpense[];
     period: {
@@ -200,6 +202,21 @@ export interface RecurringExpense {
     due_day: number;
     is_active: boolean;
     last_paid_date: string | null;
+}
+
+export type RecurringIncomeSourceType = 'ACTIVE' | 'PASSIVE' | 'OTHER';
+
+export interface RecurringIncome {
+    id: number;
+    name: string;
+    amount: string;
+    category: number | null;
+    account: number | null;
+    due_day: number;
+    source_type: RecurringIncomeSourceType;
+    auto_create: boolean;
+    is_active: boolean;
+    last_received_date: string | null;
 }
 
 export interface FinancialProfile {
@@ -331,6 +348,28 @@ export const financeService = {
     payRecurringExpense: async (id: number, date?: string, account_id?: number) => {
         const { data } = await api.post(`finance/recurring/${id}/pay/`, { date, account_id });
         return data as RecurringExpense;
+    },
+
+    // Ingresos Fijos
+    getRecurringIncomes: async () => {
+        const { data } = await api.get('finance/recurring-incomes/');
+        return data as RecurringIncome[];
+    },
+    createRecurringIncome: async (income: Partial<RecurringIncome>) => {
+        const { data } = await api.post('finance/recurring-incomes/', income);
+        return data as RecurringIncome;
+    },
+    deleteRecurringIncome: async (id: number) => {
+        const { data } = await api.delete(`finance/recurring-incomes/${id}/`);
+        return data;
+    },
+    updateRecurringIncome: async (id: number, income: Partial<RecurringIncome>) => {
+        const { data } = await api.patch(`finance/recurring-incomes/${id}/`, income);
+        return data as RecurringIncome;
+    },
+    receiveRecurringIncome: async (id: number, date?: string, account_id?: number) => {
+        const { data } = await api.post(`finance/recurring-incomes/${id}/receive/`, { date, account_id });
+        return data as RecurringIncome;
     },
 
     // User Profile / WhatsApp Settings

@@ -146,6 +146,31 @@ class RecurringExpense(models.Model):
     def __str__(self):
         return f"{self.name} - ${self.amount} (Day {self.due_day})"
 
+class RecurringIncome(models.Model):
+    SOURCE_TYPE_CHOICES = (
+        ('ACTIVE', 'Ingreso activo'),
+        ('PASSIVE', 'Ingreso pasivo'),
+        ('OTHER', 'Otro ingreso fijo'),
+    )
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='recurring_incomes')
+    name = models.CharField(max_length=150)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True)
+    account = models.ForeignKey(Account, on_delete=models.SET_NULL, null=True, blank=True, help_text="Default account to receive into")
+
+    due_day = models.IntegerField(help_text="Day of the month this income is expected (1-31)")
+    source_type = models.CharField(max_length=10, choices=SOURCE_TYPE_CHOICES, default='ACTIVE')
+    auto_create = models.BooleanField(default=True)
+    is_active = models.BooleanField(default=True)
+    last_received_date = models.DateField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.name} - ${self.amount} (Day {self.due_day})"
+
 class FinancialProfile(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='financial_profile')
     age = models.PositiveSmallIntegerField(null=True, blank=True)

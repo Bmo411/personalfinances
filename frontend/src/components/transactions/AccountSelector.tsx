@@ -6,6 +6,7 @@ import { Plus, Check, Loader2, Wallet } from 'lucide-react';
 interface AccountSelectorProps {
     value: number | null;
     onChange: (accountId: number) => void;
+    label?: string;
 }
 
 function formatAccountBalance(account: { type: string; calculated_balance: number }) {
@@ -16,7 +17,7 @@ function formatAccountBalance(account: { type: string; calculated_balance: numbe
     return `$${balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
 }
 
-export function AccountSelector({ value, onChange }: AccountSelectorProps) {
+export function AccountSelector({ value, onChange, label = 'Cuenta / Origen' }: AccountSelectorProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [search, setSearch] = useState('');
     const wrapperRef = useRef<HTMLDivElement>(null);
@@ -79,7 +80,7 @@ export function AccountSelector({ value, onChange }: AccountSelectorProps) {
     return (
         <div className="relative" ref={wrapperRef}>
             <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2 flex items-center gap-2">
-                <Wallet size={16} /> Cuenta / Origen
+                <Wallet size={16} /> {label}
             </label>
 
             <div

@@ -467,7 +467,9 @@ export function Dashboard() {
                                             <div>
                                                 <p className="font-medium text-[var(--text-primary)]">{formatShortDate(point.date)} - {point.label}</p>
                                                 {Number(point.amount || 0) > 0 && (
-                                                    <p className="text-xs text-[var(--text-secondary)]">Pago: {formatMoney(Number(point.amount || 0))}</p>
+                                                    <p className={point.direction === 'IN' ? 'text-xs text-green-600' : 'text-xs text-[var(--text-secondary)]'}>
+                                                        {point.direction === 'IN' ? 'Ingreso' : 'Pago'}: {formatMoney(Number(point.amount || 0))}
+                                                    </p>
                                                 )}
                                             </div>
                                             <strong className={Number(point.balance_after || 0) >= 0 ? 'text-brand-700' : 'text-red-500'}>
