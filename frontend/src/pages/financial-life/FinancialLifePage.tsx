@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { CheckCircle2, Circle, Compass, Target, Trophy, Wallet2 } from 'lucide-react';
+import { Brain, Briefcase, CheckCircle2, Circle, Clock, Compass, Target, Trophy, UserRound, Wallet2 } from 'lucide-react';
 import { financeService } from '../../services/finance';
 
 const currencyFormatter = new Intl.NumberFormat('en-US', {
@@ -116,6 +116,49 @@ const dailyQuotes = [
     'No necesitas mas caos para sentir que avanzas.',
 ];
 
+const growthQuotes = [
+    'La empresa crece cuando tu enfoque deja de dispersarse.',
+    'Tu siguiente nivel necesita mejores habilidades, no mas prisa.',
+    'El tiempo es el mejor consejero cuando tu sigues trabajando.',
+    'Centrarte en ti no es egoismo. Es preparar mejor al lider.',
+    'Tu empresa necesita sistemas, criterio y paciencia.',
+    'Crecer tambien significa aprender a decir no.',
+    'Cada habilidad nueva abre una puerta que antes parecia cerrada.',
+    'No busques moverte mas. Busca moverte mejor.',
+    'El enfoque es una ventaja competitiva silenciosa.',
+    'Tu negocio se expande al ritmo de tu capacidad para sostenerlo.',
+    'El tiempo revela que esfuerzos eran reales.',
+    'La persona que construyes sostiene la empresa que quieres.',
+    'Una empresa fuerte empieza con una mente ordenada.',
+    'Hoy estudia algo que manana te ahorre anos de error.',
+    'Tu energia es capital. Cuidala como cuidarias dinero.',
+    'No todo crecimiento es velocidad. A veces es profundidad.',
+    'El lider que te falta se entrena en tus habitos diarios.',
+    'La paciencia no es esperar sin hacer. Es construir sin desesperarte.',
+    'Enfocarte en ti tambien es enfocarte en tu empresa.',
+    'Una habilidad dominada vale mas que diez ideas abandonadas.',
+    'El negocio crece cuando tu criterio mejora.',
+    'El tiempo castiga la dispersion y premia la constancia.',
+    'No compitas por ruido. Compite por calidad.',
+    'Tu empresa necesita que pienses con calma y ejecutes con firmeza.',
+    'Aprender es expandir tu rango de accion.',
+    'El crecimiento real se nota primero en tus decisiones.',
+    'La mejor inversion de hoy puede ser tu atencion completa.',
+    'Tu futuro empresario se construye cuando nadie te esta viendo.',
+    'El tiempo acomoda lo que la ansiedad quiere forzar.',
+    'Cada dia enfocado es una pequena expansion.',
+    'No creces por desear mas. Creces por volverte capaz de mas.',
+    'Tu empresa no necesita perfeccion. Necesita direccion sostenida.',
+    'La habilidad que practicas hoy puede pagar tu libertad manana.',
+    'El enfoque propio es la base de un negocio sano.',
+    'El tiempo es consejero, pero solo ayuda a quien sigue caminando.',
+    'Construye una empresa que no dependa de tu caos.',
+    'Tu mente es parte de la infraestructura del negocio.',
+    'Crecer exige identidad antes que resultados.',
+    'Si quieres expandir, primero simplifica.',
+    'La calma tambien escala.',
+];
+
 const ceoQuestions = [
     'Mi patrimonio aumento esta semana',
     'Gaste por necesidad, no por impulso',
@@ -145,6 +188,14 @@ export function FinancialLifePage() {
         const currentDay = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
         const dayOfYear = Math.floor((currentDay - yearStart) / 86400000);
         return dailyQuotes[dayOfYear % dailyQuotes.length];
+    }, []);
+
+    const growthQuote = useMemo(() => {
+        const today = new Date();
+        const yearStart = Date.UTC(today.getFullYear(), 0, 0);
+        const currentDay = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+        const dayOfYear = Math.floor((currentDay - yearStart) / 86400000);
+        return growthQuotes[(dayOfYear * 7) % growthQuotes.length];
     }, []);
 
     const score = summary?.financial_score.total ?? 0;
@@ -225,6 +276,44 @@ export function FinancialLifePage() {
                             <h2 className="text-xl font-semibold text-[var(--text-primary)]">Frase de hoy</h2>
                         </div>
                         <p className="text-2xl font-semibold leading-relaxed text-[var(--text-primary)]">"{quote}"</p>
+                    </section>
+
+                    <section className="bg-[var(--bg-secondary)] border border-brand-200 rounded-2xl p-6 shadow-sm">
+                        <div className="flex items-center gap-3 mb-4">
+                            <Brain className="text-brand-700" size={24} />
+                            <h2 className="text-xl font-semibold text-[var(--text-primary)]">Enfoque de crecimiento</h2>
+                        </div>
+                        <p className="text-2xl font-semibold leading-relaxed text-[var(--text-primary)]">"{growthQuote}"</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 mt-6">
+                            <div className="rounded-xl border border-brand-100 bg-[var(--bg-main)] px-4 py-3">
+                                <div className="flex items-center gap-2 text-brand-700 font-semibold">
+                                    <Briefcase size={18} />
+                                    Empresa
+                                </div>
+                                <p className="text-sm text-[var(--text-secondary)] mt-2">Expandir con sistemas.</p>
+                            </div>
+                            <div className="rounded-xl border border-brand-100 bg-[var(--bg-main)] px-4 py-3">
+                                <div className="flex items-center gap-2 text-brand-700 font-semibold">
+                                    <Brain size={18} />
+                                    Habilidades
+                                </div>
+                                <p className="text-sm text-[var(--text-secondary)] mt-2">Aprender para sostener mas.</p>
+                            </div>
+                            <div className="rounded-xl border border-brand-100 bg-[var(--bg-main)] px-4 py-3">
+                                <div className="flex items-center gap-2 text-brand-700 font-semibold">
+                                    <UserRound size={18} />
+                                    Yo
+                                </div>
+                                <p className="text-sm text-[var(--text-secondary)] mt-2">Cuidar enfoque y energia.</p>
+                            </div>
+                            <div className="rounded-xl border border-brand-100 bg-[var(--bg-main)] px-4 py-3">
+                                <div className="flex items-center gap-2 text-brand-700 font-semibold">
+                                    <Clock size={18} />
+                                    Tiempo
+                                </div>
+                                <p className="text-sm text-[var(--text-secondary)] mt-2">Construir sin desesperarte.</p>
+                            </div>
+                        </div>
                     </section>
 
                     <section className="bg-[var(--bg-secondary)] border border-brand-200 rounded-2xl p-6 shadow-sm">
