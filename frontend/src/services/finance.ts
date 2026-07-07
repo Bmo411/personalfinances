@@ -22,6 +22,8 @@ export interface Transaction {
     description?: string;
     is_transfer?: boolean;
     spending_kind?: SpendingKind | null;
+    credit_statement_date?: string | null;
+    credit_due_date?: string | null;
 }
 
 export interface TransactionQueryParams {
@@ -109,6 +111,35 @@ export interface ImportantPayment {
     kind: 'RECURRING' | 'RECURRING_INCOME' | 'DEBT' | 'CREDIT_CARD' | 'START';
     direction?: 'IN' | 'OUT';
     balance_after?: string;
+    statement_date?: string;
+}
+
+export interface CreditCardBucketTransaction {
+    id: number;
+    date: string;
+    description: string | null;
+    amount: string;
+    credit_statement_date: string | null;
+    credit_due_date: string | null;
+    category_name: string | null;
+}
+
+export interface CreditCardBucket {
+    statement_date: string | null;
+    due_date: string;
+    purchases_total: string;
+    paid_total: string;
+    pending: string;
+    transactions: CreditCardBucketTransaction[];
+}
+
+export interface CreditCardBucketsResponse {
+    card_id: number;
+    buckets: CreditCardBucket[];
+    next_bucket: CreditCardBucket | null;
+    future_pending: string;
+    unbucketed_total: string;
+    unassigned_payment_remaining: string;
 }
 
 export interface NetWorthHistoryPoint {
@@ -248,6 +279,10 @@ export const financeService = {
         const { data } = await api.post('finance/transactions/', transaction);
         return data as Transaction;
     },
+    updateTransaction: async (id: number, transaction: Partial<Transaction>) => {
+        const { data } = await api.patch(`finance/transactions/${id}/`, transaction);
+        return data as Transaction;
+    },
     createTransfer: async (transferData: { from_account: number, to_account: number, amount: string, date: string, description?: string }) => {
         const { data } = await api.post('finance/transactions/transfer/', transferData);
         return data;
@@ -326,6 +361,18 @@ export const financeService = {
             notes
         });
         return data;
+    },
+    getCreditCardBuckets: async (id: number) => {
+        const { data } = await api.get(`finance/accounts/${id}/credit_buckets/`);
+        return data as CreditCardBucketsResponse;
+    },
+    payCreditStatement: async (id: number, payload: { source_account_id: number; due_date: string; amount?: string; date?: string }) => {
+        const { data } = await api.post(`finance/accounts/${id}/pay_credit_statement/`, payload);
+        return data as CreditCardBucketsResponse;
+    },
+    payCreditAmount: async (id: number, payload: { source_account_id: number; amount: string; date?: string }) => {
+        const { data } = await api.post(`finance/accounts/${id}/pay_credit_amount/`, payload);
+        return data as CreditCardBucketsResponse;
     },
 
     // Gastos Fijos (Recurring)

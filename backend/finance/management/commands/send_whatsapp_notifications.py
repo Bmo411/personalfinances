@@ -5,8 +5,8 @@ from decimal import Decimal
 import requests as http_requests
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
-from django.db.models import Sum
 
+from finance.credit_cards import build_credit_card_buckets, next_pending_credit_bucket
 from finance.models import Account, RecurringExpense, RecurringIncome, Transaction
 
 
@@ -95,29 +95,12 @@ class Command(BaseCommand):
         cards = Account.objects.filter(user=user, is_active=True, type='CREDIT')
 
         for card in cards:
-            debt = self._credit_card_debt(user, card)
+            bucket_data = build_credit_card_buckets(user, card)
+            self._maybe_send_card_cut(user, card, today, bucket_data)
+            self._maybe_send_card_payment(user, card, today)
 
-            self._maybe_send_card_date(
-                user=user,
-                card=card,
-                day=card.statement_cut_day,
-                today=today,
-                event_label='corte',
-                debt=debt,
-            )
-
-            if debt > Decimal('0.00'):
-                self._maybe_send_card_date(
-                    user=user,
-                    card=card,
-                    day=card.payment_due_day,
-                    today=today,
-                    event_label='pago',
-                    debt=debt,
-                )
-
-    def _maybe_send_card_date(self, user, card, day, today, event_label, debt):
-        event_date = self._next_date_for_day(day, today)
+    def _maybe_send_card_cut(self, user, card, today, bucket_data):
+        event_date = self._next_date_for_day(card.statement_cut_day, today)
         if not event_date:
             return
 
@@ -125,29 +108,35 @@ class Command(BaseCommand):
         if days_until not in NOTIFY_DAYS:
             return
 
-        if event_label == 'corte':
-            message = (
-                f'*Corte de tarjeta*\n'
-                f'{card.name} corta {self._days_text(days_until)} '
-                f'({event_date.strftime("%d/%m/%Y")}).\n'
-                f'Deuda actual registrada: ${float(debt):,.2f}.'
-            )
-        else:
-            message = (
-                f'*Pago de tarjeta*\n'
-                f'{card.name} vence {self._days_text(days_until)} '
-                f'({event_date.strftime("%d/%m/%Y")}).\n'
-                f'Deuda actual registrada: ${float(debt):,.2f}.'
-            )
+        cut_amount = sum(
+            (bucket['purchases_total'] for bucket in bucket_data['buckets'] if bucket['statement_date'] == event_date),
+            Decimal('0.00'),
+        )
+        message = (
+            f'*Corte de tarjeta*\n'
+            f'{card.name} corta {self._days_text(days_until)} '
+            f'({event_date.strftime("%d/%m/%Y")}).\n'
+            f'Compras estimadas en ese corte: ${float(cut_amount):,.2f}.'
+        )
+        self._send_callmebot(user, message, f'{card.name} corte', days_until)
 
-        self._send_callmebot(user, message, f'{card.name} {event_label}', days_until)
+    def _maybe_send_card_payment(self, user, card, today):
+        bucket = next_pending_credit_bucket(user, card, today)
+        if not bucket:
+            return
 
-    def _credit_card_debt(self, user, card):
-        card_txs = Transaction.objects.filter(user=user, is_deleted=False, account=card)
-        incomes = card_txs.filter(type='IN').aggregate(Sum('amount'))['amount__sum'] or Decimal('0.00')
-        expenses = card_txs.filter(type='OUT').aggregate(Sum('amount'))['amount__sum'] or Decimal('0.00')
-        calculated_balance = card.balance + incomes - expenses
-        return max(Decimal('0.00'), -calculated_balance)
+        event_date = bucket['due_date']
+        days_until = (event_date - today).days
+        if days_until not in NOTIFY_DAYS:
+            return
+
+        message = (
+            f'*Pago de tarjeta*\n'
+            f'{card.name} vence {self._days_text(days_until)} '
+            f'({event_date.strftime("%d/%m/%Y")}).\n'
+            f'Monto pendiente del estado: ${float(bucket["pending"]):,.2f}.'
+        )
+        self._send_callmebot(user, message, f'{card.name} pago', days_until)
 
     def _next_date_for_day(self, day, today):
         if not day:

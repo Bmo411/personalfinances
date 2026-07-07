@@ -5,11 +5,18 @@ from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from django.db import transaction as db_transaction
 from django.db.models import Q, Sum
 from django.db.models.functions import TruncMonth
 from django.utils.dateparse import parse_date
 from .models import Category, Transaction, SavingsGoal, Debt, Account, RecurringExpense, RecurringIncome, FinancialProfile
 from .serializers import CategorySerializer, TransactionSerializer, SavingsGoalSerializer, DebtSerializer, AccountSerializer, RecurringExpenseSerializer, RecurringIncomeSerializer, FinancialProfileSerializer
+from .credit_cards import (
+    build_credit_card_buckets,
+    credit_card_debt as calculate_credit_card_debt,
+    credit_statement_and_due_dates,
+    next_pending_credit_bucket,
+)
 
 class CategoryViewSet(viewsets.ModelViewSet):
     serializer_class = CategorySerializer
@@ -45,10 +52,59 @@ class TransactionViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         spending_kind = serializer.validated_data.get('spending_kind')
         transaction_type = serializer.validated_data.get('type')
+        save_kwargs = {'user': self.request.user}
         if transaction_type == 'OUT' and not spending_kind:
-            serializer.save(user=self.request.user, spending_kind='NECESSARY')
-        else:
-            serializer.save(user=self.request.user)
+            save_kwargs['spending_kind'] = 'NECESSARY'
+
+        save_kwargs.update(self._credit_date_defaults(serializer.validated_data))
+        serializer.save(**save_kwargs)
+
+    def perform_update(self, serializer):
+        recalculate_credit_dates = any(field in serializer.validated_data for field in ['type', 'account', 'date'])
+        values = {
+            'type': serializer.instance.type,
+            'account': serializer.instance.account,
+            'date': serializer.instance.date,
+            'credit_statement_date': serializer.instance.credit_statement_date,
+            'credit_due_date': serializer.instance.credit_due_date,
+        }
+        values.update(serializer.validated_data)
+
+        save_kwargs = {}
+        if 'credit_statement_date' in serializer.validated_data:
+            values['credit_statement_date'] = serializer.validated_data.get('credit_statement_date')
+        elif recalculate_credit_dates:
+            values['credit_statement_date'] = None
+        if 'credit_due_date' in serializer.validated_data:
+            values['credit_due_date'] = serializer.validated_data.get('credit_due_date')
+        elif recalculate_credit_dates:
+            values['credit_due_date'] = None
+
+        save_kwargs.update(self._credit_date_defaults(values))
+        serializer.save(**save_kwargs)
+
+    def _credit_date_defaults(self, values):
+        transaction_type = values.get('type')
+        account = values.get('account')
+        transaction_date = values.get('date')
+
+        if transaction_type != 'OUT' or not account or account.type != 'CREDIT':
+            return {}
+
+        statement_date, due_date = credit_statement_and_due_dates(
+            transaction_date,
+            account.statement_cut_day,
+            account.payment_due_day,
+        )
+        if not statement_date or not due_date:
+            return {}
+
+        defaults = {}
+        if not values.get('credit_statement_date'):
+            defaults['credit_statement_date'] = statement_date
+        if not values.get('credit_due_date'):
+            defaults['credit_due_date'] = due_date
+        return defaults
 
     def perform_destroy(self, instance):
         instance.is_deleted = True
@@ -443,18 +499,20 @@ class TransactionViewSet(viewsets.ModelViewSet):
 
         cards = Account.objects.filter(user=user, is_active=True, type='CREDIT', payment_due_day__isnull=False)
         for card in cards:
-            debt = self._credit_card_debt(user, card)
-            if debt <= Decimal('0.00'):
+            bucket = next_pending_credit_bucket(user, card, today)
+            if not bucket or bucket['pending'] <= Decimal('0.00'):
                 continue
 
-            due_date = self._next_date_for_day(card.payment_due_day, today)
+            due_date = bucket['due_date']
             if due_date and due_date <= end:
+                event_date = due_date if due_date >= today else today
                 events.append({
-                    'date': due_date.strftime('%Y-%m-%d'),
+                    'date': event_date.strftime('%Y-%m-%d'),
                     'label': card.name,
-                    'amount': debt,
+                    'amount': bucket['pending'],
                     'kind': 'CREDIT_CARD',
                     'direction': 'OUT',
+                    'statement_date': bucket['statement_date'].strftime('%Y-%m-%d') if bucket['statement_date'] else None,
                 })
 
         return sorted(events, key=lambda item: item['date'])
@@ -476,11 +534,7 @@ class TransactionViewSet(viewsets.ModelViewSet):
         return datetime.date(year, month, min(day, last_day))
 
     def _credit_card_debt(self, user, card):
-        card_txs = Transaction.objects.filter(user=user, is_deleted=False, account=card)
-        incomes = card_txs.filter(type='IN').aggregate(Sum('amount'))['amount__sum'] or Decimal('0.00')
-        expenses = card_txs.filter(type='OUT').aggregate(Sum('amount'))['amount__sum'] or Decimal('0.00')
-        calculated_balance = card.balance + incomes - expenses
-        return max(Decimal('0.00'), -calculated_balance)
+        return calculate_credit_card_debt(user, card)
 
     def _net_worth_history(self, user, today):
         month_names = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
@@ -838,6 +892,224 @@ class AccountViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+
+    @action(detail=True, methods=['get'])
+    def credit_buckets(self, request, pk=None):
+        card = self.get_object()
+        if card.type != 'CREDIT':
+            return Response({'error': 'This account is not a credit card'}, status=400)
+
+        return Response(self._credit_bucket_payload(card))
+
+    @action(detail=True, methods=['post'])
+    def pay_credit_statement(self, request, pk=None):
+        card = self.get_object()
+        if card.type != 'CREDIT':
+            return Response({'error': 'This account is not a credit card'}, status=400)
+
+        due_date = parse_date(request.data.get('due_date', '') or '')
+        if not due_date:
+            return Response({'error': 'due_date is required'}, status=400)
+
+        source = self._payment_source_account(request)
+        if isinstance(source, Response):
+            return source
+
+        bucket = self._find_credit_bucket(card, due_date)
+        if not bucket or bucket['pending'] <= Decimal('0.00'):
+            return Response({'error': 'No pending statement found for that due_date'}, status=400)
+
+        amount = request.data.get('amount')
+        if amount in (None, ''):
+            amount = bucket['pending']
+        else:
+            parsed_amount = self._parse_positive_decimal(amount)
+            if isinstance(parsed_amount, Response):
+                return parsed_amount
+            amount = parsed_amount
+
+        if amount > bucket['pending']:
+            return Response({'error': 'Amount exceeds pending statement balance'}, status=400)
+
+        payment_date = parse_date(request.data.get('date', '') or '') or datetime.date.today()
+        with db_transaction.atomic():
+            self._create_credit_card_payment(
+                source=source,
+                card=card,
+                amount=amount,
+                payment_date=payment_date,
+                statement_date=bucket['statement_date'],
+                due_date=bucket['due_date'],
+                label=f'Pago estado tarjeta {card.name}',
+            )
+
+        return Response(self._credit_bucket_payload(card))
+
+    @action(detail=True, methods=['post'])
+    def pay_credit_amount(self, request, pk=None):
+        card = self.get_object()
+        if card.type != 'CREDIT':
+            return Response({'error': 'This account is not a credit card'}, status=400)
+
+        source = self._payment_source_account(request)
+        if isinstance(source, Response):
+            return source
+
+        amount = self._parse_positive_decimal(request.data.get('amount'))
+        if isinstance(amount, Response):
+            return amount
+
+        debt = calculate_credit_card_debt(request.user, card)
+        if amount > debt:
+            return Response({'error': 'Amount exceeds current credit card debt'}, status=400)
+
+        payment_date = parse_date(request.data.get('date', '') or '') or datetime.date.today()
+        with db_transaction.atomic():
+            Transaction.objects.create(
+                user=request.user,
+                type='OUT',
+                account=source,
+                amount=amount,
+                date=payment_date,
+                description=f'Abono libre a tarjeta {card.name}',
+                payment_method='TRANSFER',
+                is_transfer=True,
+            )
+
+            remaining = amount
+            data = build_credit_card_buckets(request.user, card)
+            for bucket in data['buckets']:
+                if remaining <= Decimal('0.00'):
+                    break
+                if bucket['pending'] <= Decimal('0.00'):
+                    continue
+
+                allocated = min(remaining, bucket['pending'])
+                Transaction.objects.create(
+                    user=request.user,
+                    type='IN',
+                    account=card,
+                    amount=allocated,
+                    date=payment_date,
+                    description=f'Abono libre a tarjeta {card.name}',
+                    payment_method='TRANSFER',
+                    is_transfer=True,
+                    credit_statement_date=bucket['statement_date'],
+                    credit_due_date=bucket['due_date'],
+                )
+                remaining -= allocated
+
+            if remaining > Decimal('0.00'):
+                Transaction.objects.create(
+                    user=request.user,
+                    type='IN',
+                    account=card,
+                    amount=remaining,
+                    date=payment_date,
+                    description=f'Abono libre a tarjeta {card.name}',
+                    payment_method='TRANSFER',
+                    is_transfer=True,
+                )
+
+        return Response(self._credit_bucket_payload(card))
+
+    def _credit_bucket_payload(self, card):
+        data = build_credit_card_buckets(self.request.user, card)
+        buckets = [self._serialize_credit_bucket(bucket) for bucket in data['buckets']]
+        pending_buckets = [bucket for bucket in data['buckets'] if bucket['pending'] > Decimal('0.00')]
+        next_bucket = pending_buckets[0] if pending_buckets else None
+        future_pending = Decimal('0.00')
+        if next_bucket:
+            future_pending = sum(
+                (bucket['pending'] for bucket in pending_buckets if bucket['due_date'] > next_bucket['due_date']),
+                Decimal('0.00'),
+            )
+
+        return {
+            'card_id': card.id,
+            'buckets': buckets,
+            'next_bucket': self._serialize_credit_bucket(next_bucket) if next_bucket else None,
+            'future_pending': future_pending,
+            'unbucketed_total': data['unbucketed_total'],
+            'unassigned_payment_remaining': data['unassigned_payment_remaining'],
+        }
+
+    def _serialize_credit_bucket(self, bucket):
+        if not bucket:
+            return None
+
+        return {
+            'statement_date': bucket['statement_date'].strftime('%Y-%m-%d') if bucket['statement_date'] else None,
+            'due_date': bucket['due_date'].strftime('%Y-%m-%d'),
+            'purchases_total': bucket['purchases_total'],
+            'paid_total': bucket['paid_total'],
+            'pending': bucket['pending'],
+            'transactions': [
+                {
+                    **transaction,
+                    'date': transaction['date'].strftime('%Y-%m-%d'),
+                    'credit_statement_date': transaction['credit_statement_date'].strftime('%Y-%m-%d') if transaction['credit_statement_date'] else None,
+                    'credit_due_date': transaction['credit_due_date'].strftime('%Y-%m-%d') if transaction['credit_due_date'] else None,
+                }
+                for transaction in bucket['transactions']
+            ],
+        }
+
+    def _find_credit_bucket(self, card, due_date):
+        data = build_credit_card_buckets(self.request.user, card)
+        for bucket in data['buckets']:
+            if bucket['due_date'] == due_date:
+                return bucket
+        return None
+
+    def _payment_source_account(self, request):
+        source_account_id = request.data.get('source_account_id') or request.data.get('account_id')
+        if not source_account_id:
+            return Response({'error': 'source_account_id is required'}, status=400)
+
+        source = Account.objects.filter(id=source_account_id, user=request.user, is_active=True).first()
+        if not source:
+            return Response({'error': 'Source account not found'}, status=404)
+        if source.type == 'CREDIT':
+            return Response({'error': 'Source account cannot be another credit card'}, status=400)
+        return source
+
+    def _parse_positive_decimal(self, amount):
+        if amount in (None, ''):
+            return Response({'error': 'amount is required'}, status=400)
+
+        try:
+            amount = Decimal(str(amount))
+        except (InvalidOperation, ValueError):
+            return Response({'error': 'Invalid amount'}, status=400)
+
+        if amount <= Decimal('0.00'):
+            return Response({'error': 'Amount must be positive'}, status=400)
+        return amount
+
+    def _create_credit_card_payment(self, source, card, amount, payment_date, statement_date, due_date, label):
+        Transaction.objects.create(
+            user=self.request.user,
+            type='OUT',
+            account=source,
+            amount=amount,
+            date=payment_date,
+            description=label,
+            payment_method='TRANSFER',
+            is_transfer=True,
+        )
+        Transaction.objects.create(
+            user=self.request.user,
+            type='IN',
+            account=card,
+            amount=amount,
+            date=payment_date,
+            description=label,
+            payment_method='TRANSFER',
+            is_transfer=True,
+            credit_statement_date=statement_date,
+            credit_due_date=due_date,
+        )
 
     @action(detail=True, methods=['post'])
     def reconcile(self, request, pk=None):

@@ -1,72 +1,31 @@
-import { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { FormEvent, useMemo, useState } from 'react';
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { QueryClient } from '@tanstack/react-query';
 import { CalendarClock, CheckCircle2, CreditCard, Loader2, Pencil, PlusCircle, Trash2, Wallet2 } from 'lucide-react';
-import { Account, financeService } from '../../services/finance';
+import type { LucideIcon } from 'lucide-react';
+import { Account, CreditCardBucket, CreditCardBucketTransaction, financeService } from '../../services/finance';
 import { Modal } from '../../components/ui/Modal';
 
 type CreditCardAccount = Account & { calculated_balance: number };
+type PaymentTarget =
+    | { mode: 'statement'; card: CreditCardAccount; bucket: CreditCardBucket }
+    | { mode: 'free'; card: CreditCardAccount };
+type AdjustmentTarget = { card: CreditCardAccount; transaction: CreditCardBucketTransaction };
 
 function money(value: number) {
     return value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function makeDate(year: number, month: number, day: number) {
-    const lastDay = new Date(year, month + 1, 0).getDate();
-    return new Date(year, month, Math.min(day, lastDay));
-}
-
-function addDays(date: Date, days: number) {
-    const copy = new Date(date);
-    copy.setDate(copy.getDate() + days);
-    return copy;
-}
-
-function formatDate(date: Date) {
-    return date.toLocaleDateString('es-MX', { day: '2-digit', month: 'short' });
-}
-
-function parseLocalDate(value: string) {
-    return new Date(`${value}T00:00:00`);
-}
-
-function nextDateForDay(day: number | null, today: Date) {
-    if (!day) return null;
-    const currentMonthDate = makeDate(today.getFullYear(), today.getMonth(), day);
-    if (currentMonthDate >= new Date(today.getFullYear(), today.getMonth(), today.getDate())) {
-        return currentMonthDate;
-    }
-    return makeDate(today.getFullYear(), today.getMonth() + 1, day);
-}
-
-function daysUntil(date: Date | null, today: Date) {
-    if (!date) return null;
-    const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    return Math.ceil((date.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-}
-
-function getCycleWindow(cutDay: number | null, today: Date) {
-    if (!cutDay) return null;
-
-    const currentCut = makeDate(today.getFullYear(), today.getMonth(), cutDay);
-    const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-
-    if (todayOnly > currentCut) {
-        return {
-            start: addDays(currentCut, 1),
-            end: makeDate(today.getFullYear(), today.getMonth() + 1, cutDay),
-        };
-    }
-
-    const previousCut = makeDate(today.getFullYear(), today.getMonth() - 1, cutDay);
-    return {
-        start: addDays(previousCut, 1),
-        end: currentCut,
-    };
+function formatDate(value: string | null | undefined) {
+    if (!value) return 'Sin fecha';
+    return new Date(`${value}T00:00:00`).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
 export function CreditCardsPage() {
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [editingCard, setEditingCard] = useState<CreditCardAccount | null>(null);
+    const [paymentTarget, setPaymentTarget] = useState<PaymentTarget | null>(null);
+    const [adjustmentTarget, setAdjustmentTarget] = useState<AdjustmentTarget | null>(null);
     const queryClient = useQueryClient();
 
     const { data: accounts = [], isLoading: loadingAccounts } = useQuery({
@@ -79,22 +38,14 @@ export function CreditCardsPage() {
         queryFn: () => financeService.getSummary(),
     });
 
-    const { data: transactions = [], isLoading: loadingTransactions } = useQuery({
-        queryKey: ['transactions', 'credit-cards'],
-        queryFn: () => financeService.getTransactions(),
-    });
-
     const deleteMutation = useMutation({
         mutationFn: financeService.deleteAccount,
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['accounts'] });
-            queryClient.invalidateQueries({ queryKey: ['summary'] });
-            queryClient.invalidateQueries({ queryKey: ['transactions'] });
+            invalidateCreditCards(queryClient);
         },
     });
 
-    const today = new Date();
-    const creditCards: CreditCardAccount[] = accounts
+    const creditCards: CreditCardAccount[] = useMemo(() => accounts
         .filter((account) => account.type === 'CREDIT')
         .map((account) => {
             const summaryMatch = summary?.accounts?.find((item) => item.id === account.id);
@@ -102,14 +53,26 @@ export function CreditCardsPage() {
                 ...account,
                 calculated_balance: Number(summaryMatch?.calculated_balance ?? account.balance),
             };
-        });
+        }), [accounts, summary]);
+
+    const bucketQueries = useQueries({
+        queries: creditCards.map((card) => ({
+            queryKey: ['credit-card-buckets', card.id],
+            queryFn: () => financeService.getCreditCardBuckets(card.id),
+            enabled: Boolean(card.id),
+        })),
+    });
+
+    const bucketByCard = new Map(creditCards.map((card, index) => [card.id, bucketQueries[index]?.data]));
+    const sourceAccounts = accounts.filter((account) => account.type !== 'CREDIT' && account.is_active);
 
     const totalDebt = creditCards.reduce((sum, card) => sum + Math.max(0, -card.calculated_balance), 0);
     const totalLimit = creditCards.reduce((sum, card) => sum + Number(card.credit_limit || 0), 0);
     const totalAvailable = Math.max(0, totalLimit - totalDebt);
-    const cycleTotal = creditCards.reduce((sum, card) => sum + getCycleSpend(card, transactions, today), 0);
-
-    const loading = loadingAccounts || loadingTransactions;
+    const totalNextPayment = creditCards.reduce((sum, card) => sum + Number(bucketByCard.get(card.id)?.next_bucket?.pending || 0), 0);
+    const totalFuturePending = creditCards.reduce((sum, card) => sum + Number(bucketByCard.get(card.id)?.future_pending || 0), 0);
+    const loadingBuckets = bucketQueries.some((query) => query.isLoading);
+    const loading = loadingAccounts || loadingBuckets;
 
     const handleDeleteCard = (card: CreditCardAccount, debt: number) => {
         if (debt > 0) {
@@ -131,7 +94,7 @@ export function CreditCardsPage() {
             <header className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-8">
                 <div>
                     <h1 className="text-3xl font-bold text-[var(--text-primary)]">Tarjetas de credito</h1>
-                    <p className="text-[var(--text-secondary)] mt-1">Controla deuda, limite, corte, pago y gasto del ciclo.</p>
+                    <p className="text-[var(--text-secondary)] mt-1">Controla estados, pagos reales, compras futuras y credito disponible.</p>
                 </div>
 
                 <button
@@ -144,29 +107,15 @@ export function CreditCardsPage() {
             </header>
 
             <section className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-                <div className="bg-[var(--bg-secondary)] rounded-2xl p-6 shadow-sm border border-brand-200">
-                    <div className="flex items-center gap-2 text-[var(--text-secondary)] text-sm font-medium mb-2">
-                        <CreditCard size={18} /> Deuda actual
-                    </div>
-                    <p className="text-3xl font-bold text-red-500">${money(totalDebt)}</p>
-                </div>
-                <div className="bg-[var(--bg-secondary)] rounded-2xl p-6 shadow-sm border border-brand-200">
-                    <div className="flex items-center gap-2 text-[var(--text-secondary)] text-sm font-medium mb-2">
-                        <Wallet2 size={18} /> Credito disponible
-                    </div>
-                    <p className="text-3xl font-bold text-brand-700">${money(totalAvailable)}</p>
-                </div>
-                <div className="bg-[var(--bg-secondary)] rounded-2xl p-6 shadow-sm border border-brand-200">
-                    <div className="flex items-center gap-2 text-[var(--text-secondary)] text-sm font-medium mb-2">
-                        <CalendarClock size={18} /> Gasto ciclo actual
-                    </div>
-                    <p className="text-3xl font-bold text-[var(--text-primary)]">${money(cycleTotal)}</p>
-                </div>
+                <SummaryCard icon={CreditCard} label="Deuda total" value={`$${money(totalDebt)}`} tone="red" />
+                <SummaryCard icon={Wallet2} label="Credito disponible" value={`$${money(totalAvailable)}`} tone="brand" />
+                <SummaryCard icon={CalendarClock} label="Proximo pago real" value={`$${money(totalNextPayment)}`} />
                 <div className="bg-green-50 rounded-2xl p-6 shadow-sm border border-green-200 text-green-800">
                     <div className="flex items-center gap-2 text-sm font-semibold mb-2">
-                        <CheckCircle2 size={18} /> Liquidez
+                        <CheckCircle2 size={18} /> Compras futuras
                     </div>
-                    <p className="text-sm">El limite de credito no se suma a tu liquidez; solo se resta la deuda del patrimonio.</p>
+                    <p className="text-3xl font-bold">${money(totalFuturePending)}</p>
+                    <p className="text-xs mt-2">Compras que vencen despues del proximo pago.</p>
                 </div>
             </section>
 
@@ -179,22 +128,19 @@ export function CreditCardsPage() {
                     <p className="text-[var(--text-secondary)] mt-2">Agrega una tarjeta para separar deuda, fechas y credito disponible.</p>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 gap-6">
                     {creditCards.map((card) => {
                         const debt = Math.max(0, -card.calculated_balance);
                         const limit = Number(card.credit_limit || 0);
                         const available = Math.max(0, limit - debt);
                         const utilization = limit > 0 ? Math.min(100, (debt / limit) * 100) : 0;
-                        const nextCut = nextDateForDay(card.statement_cut_day, today);
-                        const nextPayment = nextDateForDay(card.payment_due_day, today);
-                        const cycleWindow = getCycleWindow(card.statement_cut_day, today);
-                        const cycleSpend = getCycleSpend(card, transactions, today);
-                        const cutDays = daysUntil(nextCut, today);
-                        const paymentDays = daysUntil(nextPayment, today);
+                        const bucketData = bucketByCard.get(card.id);
+                        const nextBucket = bucketData?.next_bucket;
+                        const futurePending = Number(bucketData?.future_pending || 0);
 
                         return (
                             <article key={card.id} className="bg-[var(--bg-secondary)] rounded-2xl p-6 shadow-sm border border-brand-200">
-                                <div className="flex items-start justify-between gap-4 mb-5">
+                                <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-5 mb-5">
                                     <div className="flex items-center gap-3">
                                         <div className="p-3 bg-brand-50 rounded-xl" style={{ color: card.color || '#97A97C' }}>
                                             <CreditCard size={24} />
@@ -204,7 +150,13 @@ export function CreditCardsPage() {
                                             <p className="text-sm text-[var(--text-secondary)]">Corte {card.statement_cut_day || '-'} / Pago {card.payment_due_day || '-'}</p>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <button
+                                            onClick={() => setPaymentTarget({ mode: 'free', card })}
+                                            className="px-3 py-2 rounded-lg border border-brand-200 text-sm font-medium text-brand-700 hover:bg-[var(--bg-hover)] transition-colors"
+                                        >
+                                            Abono libre
+                                        </button>
                                         <button
                                             onClick={() => setEditingCard(card)}
                                             className="p-2 rounded-lg text-[var(--text-secondary)] hover:bg-brand-50 hover:text-brand-700 transition-colors"
@@ -225,48 +177,41 @@ export function CreditCardsPage() {
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-4 mb-5">
-                                    <div>
-                                        <p className="text-xs text-[var(--text-secondary)] mb-1">Deuda</p>
-                                        <p className="text-2xl font-bold text-red-500">${money(debt)}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-xs text-[var(--text-secondary)] mb-1">Disponible</p>
-                                        <p className="text-2xl font-bold text-brand-700">${money(available)}</p>
-                                    </div>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
+                                    <CardMetric label="Deuda" value={`$${money(debt)}`} className="text-red-500" />
+                                    <CardMetric label="Disponible" value={`$${money(available)}`} className="text-brand-700" />
+                                    <CardMetric label="Proximo pago" value={`$${money(Number(nextBucket?.pending || 0))}`} className="text-[var(--text-primary)]" />
+                                    <CardMetric label="Futuro" value={`$${money(futurePending)}`} className="text-[var(--text-primary)]" />
                                 </div>
 
-                                <div className="h-3 w-full bg-[var(--bg-main)] rounded-full overflow-hidden mb-4">
+                                <div className="h-3 w-full bg-[var(--bg-main)] rounded-full overflow-hidden mb-5">
                                     <div
                                         className="h-full bg-red-400 transition-all"
                                         style={{ width: `${utilization}%` }}
                                     />
                                 </div>
 
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
-                                    <div className="bg-[var(--bg-main)] rounded-xl p-3">
-                                        <p className="text-[var(--text-secondary)]">Limite</p>
-                                        <p className="font-bold text-[var(--text-primary)]">${money(limit)}</p>
+                                {!card.statement_cut_day || !card.payment_due_day ? (
+                                    <div className="rounded-xl border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm text-yellow-800">
+                                        Configura dia de corte y dia limite de pago para calcular estados.
                                     </div>
-                                    <div className="bg-[var(--bg-main)] rounded-xl p-3">
-                                        <p className="text-[var(--text-secondary)]">Proximo corte</p>
-                                        <p className="font-bold text-[var(--text-primary)]">{nextCut ? `${formatDate(nextCut)} (${cutDays}d)` : 'Sin fecha'}</p>
+                                ) : !bucketData || bucketData.buckets.length === 0 ? (
+                                    <div className="rounded-xl border border-brand-100 bg-[var(--bg-main)] px-4 py-3 text-sm text-[var(--text-secondary)]">
+                                        No hay compras con estado de cuenta para esta tarjeta.
                                     </div>
-                                    <div className="bg-[var(--bg-main)] rounded-xl p-3">
-                                        <p className="text-[var(--text-secondary)]">Proximo pago</p>
-                                        <p className="font-bold text-[var(--text-primary)]">{nextPayment ? `${formatDate(nextPayment)} (${paymentDays}d)` : 'Sin fecha'}</p>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {bucketData.buckets.map((bucket) => (
+                                            <BucketRow
+                                                key={`${card.id}-${bucket.due_date}`}
+                                                card={card}
+                                                bucket={bucket}
+                                                onPay={() => setPaymentTarget({ mode: 'statement', card, bucket })}
+                                                onAdjust={(transaction) => setAdjustmentTarget({ card, transaction })}
+                                            />
+                                        ))}
                                     </div>
-                                </div>
-
-                                <div className="mt-4 border-t border-brand-100 pt-4 flex items-center justify-between gap-3">
-                                    <div>
-                                        <p className="text-xs text-[var(--text-secondary)]">Compras del ciclo</p>
-                                        <p className="font-bold text-[var(--text-primary)]">${money(cycleSpend)}</p>
-                                    </div>
-                                    <p className="text-xs text-[var(--text-secondary)] text-right">
-                                        {cycleWindow ? `${formatDate(cycleWindow.start)} - ${formatDate(cycleWindow.end)}` : 'Configura dia de corte'}
-                                    </p>
-                                </div>
+                                )}
                             </article>
                         );
                     })}
@@ -285,21 +230,239 @@ export function CreditCardsPage() {
                     />
                 )}
             </Modal>
+
+            <Modal isOpen={!!paymentTarget} onClose={() => setPaymentTarget(null)} title={paymentTarget?.mode === 'statement' ? 'Pagar estado' : 'Abono libre'}>
+                {paymentTarget && (
+                    <CreditPaymentForm
+                        target={paymentTarget}
+                        sourceAccounts={sourceAccounts}
+                        onSuccess={() => setPaymentTarget(null)}
+                    />
+                )}
+            </Modal>
+
+            <Modal isOpen={!!adjustmentTarget} onClose={() => setAdjustmentTarget(null)} title="Ajustar fecha de pago">
+                {adjustmentTarget && (
+                    <AdjustDueDateForm
+                        target={adjustmentTarget}
+                        onSuccess={() => setAdjustmentTarget(null)}
+                    />
+                )}
+            </Modal>
         </div>
     );
 }
 
-function getCycleSpend(card: CreditCardAccount, transactions: Awaited<ReturnType<typeof financeService.getTransactions>>, today: Date) {
-    const window = getCycleWindow(card.statement_cut_day, today);
-    if (!window) return 0;
+function SummaryCard({ icon: Icon, label, value, tone }: { icon: LucideIcon; label: string; value: string; tone?: 'red' | 'brand' }) {
+    const valueClass = tone === 'red' ? 'text-red-500' : tone === 'brand' ? 'text-brand-700' : 'text-[var(--text-primary)]';
+    return (
+        <div className="bg-[var(--bg-secondary)] rounded-2xl p-6 shadow-sm border border-brand-200">
+            <div className="flex items-center gap-2 text-[var(--text-secondary)] text-sm font-medium mb-2">
+                <Icon size={18} /> {label}
+            </div>
+            <p className={`text-3xl font-bold ${valueClass}`}>{value}</p>
+        </div>
+    );
+}
 
-    return transactions
-        .filter((transaction) => {
-            if (transaction.account !== card.id || transaction.type !== 'OUT' || transaction.is_transfer) return false;
-            const txDate = parseLocalDate(transaction.date);
-            return txDate >= window.start && txDate <= window.end;
-        })
-        .reduce((sum, transaction) => sum + Number(transaction.amount), 0);
+function CardMetric({ label, value, className }: { label: string; value: string; className: string }) {
+    return (
+        <div>
+            <p className="text-xs text-[var(--text-secondary)] mb-1">{label}</p>
+            <p className={`text-2xl font-bold ${className}`}>{value}</p>
+        </div>
+    );
+}
+
+function BucketRow({
+    card,
+    bucket,
+    onPay,
+    onAdjust,
+}: {
+    card: CreditCardAccount;
+    bucket: CreditCardBucket;
+    onPay: () => void;
+    onAdjust: (transaction: CreditCardBucketTransaction) => void;
+}) {
+    const pending = Number(bucket.pending || 0);
+    return (
+        <div className="rounded-xl border border-brand-100 bg-[var(--bg-main)] p-4">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 items-start">
+                <div>
+                    <p className="text-xs text-[var(--text-secondary)]">Corte</p>
+                    <p className="font-semibold text-[var(--text-primary)]">{formatDate(bucket.statement_date)}</p>
+                </div>
+                <div>
+                    <p className="text-xs text-[var(--text-secondary)]">Vence</p>
+                    <p className="font-semibold text-[var(--text-primary)]">{formatDate(bucket.due_date)}</p>
+                </div>
+                <div>
+                    <p className="text-xs text-[var(--text-secondary)]">Compras</p>
+                    <p className="font-semibold text-[var(--text-primary)]">${money(Number(bucket.purchases_total || 0))}</p>
+                </div>
+                <div>
+                    <p className="text-xs text-[var(--text-secondary)]">Pagado / pendiente</p>
+                    <p className="font-semibold text-[var(--text-primary)]">${money(Number(bucket.paid_total || 0))} / ${money(pending)}</p>
+                </div>
+                <div className="flex justify-start md:justify-end">
+                    <button
+                        onClick={onPay}
+                        disabled={pending <= 0}
+                        className="px-3 py-2 rounded-lg bg-brand-700 hover:bg-brand-900 text-white text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                        Pagar estado
+                    </button>
+                </div>
+            </div>
+
+            {bucket.transactions.length > 0 && (
+                <div className="mt-4 space-y-2">
+                    {bucket.transactions.map((transaction) => (
+                        <div key={`${card.id}-${transaction.id}`} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 rounded-lg bg-[var(--bg-secondary)] border border-brand-100 px-3 py-2">
+                            <div>
+                                <p className="text-sm font-medium text-[var(--text-primary)]">{transaction.description || 'Compra con tarjeta'}</p>
+                                <p className="text-xs text-[var(--text-secondary)]">{formatDate(transaction.date)} - vence {formatDate(transaction.credit_due_date)}</p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <span className="font-semibold text-[var(--text-primary)]">${money(Number(transaction.amount || 0))}</span>
+                                <button
+                                    onClick={() => onAdjust(transaction)}
+                                    className="text-xs font-semibold text-brand-700 hover:text-brand-900"
+                                >
+                                    Ajustar
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
+
+function CreditPaymentForm({ target, sourceAccounts, onSuccess }: { target: PaymentTarget; sourceAccounts: Account[]; onSuccess: () => void }) {
+    const [sourceAccountId, setSourceAccountId] = useState(sourceAccounts[0]?.id ? String(sourceAccounts[0].id) : '');
+    const [amount, setAmount] = useState(target.mode === 'statement' ? target.bucket.pending : '');
+    const queryClient = useQueryClient();
+
+    const mutation = useMutation({
+        mutationFn: () => {
+            const source_account_id = Number(sourceAccountId);
+            if (target.mode === 'statement') {
+                return financeService.payCreditStatement(target.card.id, {
+                    source_account_id,
+                    due_date: target.bucket.due_date,
+                    amount,
+                });
+            }
+            return financeService.payCreditAmount(target.card.id, {
+                source_account_id,
+                amount,
+            });
+        },
+        onSuccess: () => {
+            invalidateCreditCards(queryClient);
+            onSuccess();
+        },
+    });
+
+    const handleSubmit = (event: FormEvent) => {
+        event.preventDefault();
+        mutation.mutate();
+    };
+
+    return (
+        <form onSubmit={handleSubmit} className="space-y-4">
+            {target.mode === 'statement' && (
+                <div className="rounded-xl border border-brand-200 bg-[var(--bg-main)] px-4 py-3">
+                    <p className="text-sm text-[var(--text-secondary)]">Estado de cuenta</p>
+                <p className="font-semibold text-[var(--text-primary)]">Vence {formatDate(target.bucket.due_date)} - pendiente ${money(Number(target.bucket.pending || 0))}</p>
+                </div>
+            )}
+
+            <label className="block">
+                <span className="block text-sm font-medium text-[var(--text-secondary)] mb-2">Cuenta origen</span>
+                <select
+                    value={sourceAccountId}
+                    onChange={(event) => setSourceAccountId(event.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border border-brand-200 bg-[var(--bg-main)] text-[var(--text-primary)]"
+                    required
+                >
+                    {sourceAccounts.map((account) => (
+                        <option key={account.id} value={account.id}>{account.name}</option>
+                    ))}
+                </select>
+            </label>
+
+            <label className="block">
+                <span className="block text-sm font-medium text-[var(--text-secondary)] mb-2">Monto</span>
+                <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={amount}
+                    onChange={(event) => setAmount(event.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border border-brand-200 bg-[var(--bg-main)] text-[var(--text-primary)]"
+                    required
+                />
+            </label>
+
+            <button
+                type="submit"
+                disabled={mutation.isPending || !sourceAccountId || !amount}
+                className="w-full bg-brand-700 hover:bg-brand-900 text-white font-medium py-3 rounded-xl flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+                {mutation.isPending ? <Loader2 className="animate-spin" /> : target.mode === 'statement' ? 'Pagar estado' : 'Registrar abono'}
+            </button>
+        </form>
+    );
+}
+
+function AdjustDueDateForm({ target, onSuccess }: { target: AdjustmentTarget; onSuccess: () => void }) {
+    const [dueDate, setDueDate] = useState(target.transaction.credit_due_date || '');
+    const queryClient = useQueryClient();
+
+    const mutation = useMutation({
+        mutationFn: () => financeService.updateTransaction(target.transaction.id, { credit_due_date: dueDate || null }),
+        onSuccess: () => {
+            invalidateCreditCards(queryClient);
+            onSuccess();
+        },
+    });
+
+    const handleSubmit = (event: FormEvent) => {
+        event.preventDefault();
+        mutation.mutate();
+    };
+
+    return (
+        <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="rounded-xl border border-brand-200 bg-[var(--bg-main)] px-4 py-3">
+                <p className="text-sm text-[var(--text-secondary)]">Compra</p>
+                <p className="font-semibold text-[var(--text-primary)]">{target.transaction.description || 'Compra con tarjeta'} - ${money(Number(target.transaction.amount || 0))}</p>
+            </div>
+
+            <label className="block">
+                <span className="block text-sm font-medium text-[var(--text-secondary)] mb-2">Nueva fecha de pago</span>
+                <input
+                    type="date"
+                    value={dueDate}
+                    onChange={(event) => setDueDate(event.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border border-brand-200 bg-[var(--bg-main)] text-[var(--text-primary)]"
+                    required
+                />
+            </label>
+
+            <button
+                type="submit"
+                disabled={mutation.isPending || !dueDate}
+                className="w-full bg-brand-700 hover:bg-brand-900 text-white font-medium py-3 rounded-xl flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+                {mutation.isPending ? <Loader2 className="animate-spin" /> : 'Guardar ajuste'}
+            </button>
+        </form>
+    );
 }
 
 function CreditCardForm({ card, onSuccess }: { card?: CreditCardAccount, onSuccess: () => void }) {
@@ -328,13 +491,12 @@ function CreditCardForm({ card, onSuccess }: { card?: CreditCardAccount, onSucce
                 : financeService.createAccount(payload);
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['accounts'] });
-            queryClient.invalidateQueries({ queryKey: ['summary'] });
+            invalidateCreditCards(queryClient);
             onSuccess();
         },
     });
 
-    const handleSubmit = (event: React.FormEvent) => {
+    const handleSubmit = (event: FormEvent) => {
         event.preventDefault();
         mutation.mutate();
     };
@@ -376,7 +538,7 @@ function CreditCardForm({ card, onSuccess }: { card?: CreditCardAccount, onSucce
                         value={statementCutDay}
                         onChange={(event) => setStatementCutDay(event.target.value)}
                         className="w-full px-4 py-3 rounded-xl border border-brand-200 bg-[var(--bg-main)] text-[var(--text-primary)]"
-                        placeholder="15"
+                        placeholder="20"
                     />
                 </div>
                 <div>
@@ -388,7 +550,7 @@ function CreditCardForm({ card, onSuccess }: { card?: CreditCardAccount, onSucce
                         value={paymentDueDay}
                         onChange={(event) => setPaymentDueDay(event.target.value)}
                         className="w-full px-4 py-3 rounded-xl border border-brand-200 bg-[var(--bg-main)] text-[var(--text-primary)]"
-                        placeholder="5"
+                        placeholder="10"
                     />
                 </div>
             </div>
@@ -412,4 +574,11 @@ function CreditCardForm({ card, onSuccess }: { card?: CreditCardAccount, onSucce
             </button>
         </form>
     );
+}
+
+function invalidateCreditCards(queryClient: QueryClient) {
+    queryClient.invalidateQueries({ queryKey: ['accounts'] });
+    queryClient.invalidateQueries({ queryKey: ['summary'] });
+    queryClient.invalidateQueries({ queryKey: ['transactions'] });
+    queryClient.invalidateQueries({ queryKey: ['credit-card-buckets'] });
 }

@@ -42,6 +42,8 @@ class Transaction(models.Model):
     description = models.TextField(blank=True, null=True)
     payment_method = models.CharField(max_length=10, choices=METHOD_CHOICES)
     spending_kind = models.CharField(max_length=12, choices=SPENDING_KIND_CHOICES, blank=True, null=True)
+    credit_statement_date = models.DateField(blank=True, null=True)
+    credit_due_date = models.DateField(blank=True, null=True)
     
     is_transfer = models.BooleanField(default=False)
     is_deleted = models.BooleanField(default=False)
@@ -52,6 +54,7 @@ class Transaction(models.Model):
         indexes = [
             models.Index(fields=['user', 'date']),
             models.Index(fields=['user', 'type']),
+            models.Index(fields=['user', 'credit_due_date']),
         ]
         
     def __str__(self):
