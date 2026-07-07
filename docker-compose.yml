@@ -54,8 +54,8 @@ services:
       context: ./backend
     container_name: finance_scheduler
     restart: unless-stopped
-    # Runs the notification check once a day (86400 seconds = 24 hours)
-    command: sh -c "while true; do python manage.py send_whatsapp_notifications; sleep 86400; done"
+    # Runs notification checks hourly for class/task reminders and daily summaries.
+    command: sh -c "while true; do python manage.py send_whatsapp_notifications; sleep 3600; done"
     environment:
       - DB_NAME=${DB_NAME}
       - DB_USER=${DB_USER}

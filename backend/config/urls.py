@@ -45,4 +45,5 @@ urlpatterns = [
     
     # Finance Endpoints
     path('api/finance/', include(router.urls)),
+    path('api/life/', include('life.urls')),
 ]

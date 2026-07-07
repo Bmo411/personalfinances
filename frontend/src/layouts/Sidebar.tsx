@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
-import { Wallet2, LayoutDashboard, History, PiggyBank, LogOut, Settings, Target, Users, CalendarClock, CreditCard, Compass } from 'lucide-react';
+import { Wallet2, LayoutDashboard, History, PiggyBank, LogOut, Settings, Target, Users, CalendarClock, CreditCard, Compass, CalendarDays } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -12,6 +12,7 @@ function cn(...inputs: (string | undefined | null | false)[]) {
 const navItems = [
     { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
     { icon: Compass, label: 'Mi vida', path: '/financial-life' },
+    { icon: CalendarDays, label: 'Mi Mes', path: '/month' },
     { icon: Wallet2, label: 'Cuentas', path: '/accounts' },
     { icon: CreditCard, label: 'Tarjetas', path: '/credit-cards' },
     { icon: CalendarClock, label: 'Fijos', path: '/recurring' },

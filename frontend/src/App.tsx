@@ -8,6 +8,7 @@ import { FinancialLifePage } from './pages/financial-life/FinancialLifePage';
 import { PreferencesPage } from './pages/preferences/PreferencesPage';
 import { AccountsPage } from './pages/accounts/AccountsPage';
 import { CreditCardsPage } from './pages/credit-cards/CreditCardsPage';
+import { MonthPage } from './pages/month/MonthPage';
 import { SavingsPage } from './pages/savings/SavingsPage';
 import { DebtsPage } from './pages/debts/DebtsPage';
 import { RecurringPage } from './pages/recurring/RecurringPage';
@@ -26,6 +27,7 @@ function App() {
         <Route element={<MainLayout />}>
           <Route path="/" element={<Dashboard />} />
           <Route path="/financial-life" element={<FinancialLifePage />} />
+          <Route path="/month" element={<MonthPage />} />
           <Route path="/preferences" element={<PreferencesPage />} />
           <Route path="/accounts" element={<AccountsPage />} />
           <Route path="/credit-cards" element={<CreditCardsPage />} />

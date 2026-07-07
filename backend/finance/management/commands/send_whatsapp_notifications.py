@@ -5,20 +5,25 @@ from decimal import Decimal
 import requests as http_requests
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
+from django.utils import timezone
 
 from finance.credit_cards import build_credit_card_buckets, next_pending_credit_bucket
 from finance.models import Account, RecurringExpense, RecurringIncome, Transaction
+from life.models import Lesson, NotificationLog, Student, WorkTask
+from life.services import build_month_summary
 
 
 User = get_user_model()
 NOTIFY_DAYS = [7, 3, 1, 0]
+DAILY_SUMMARY_HOURS = range(6, 11)
 
 
 class Command(BaseCommand):
-    help = 'Send WhatsApp reminders for recurring expenses and credit card dates.'
+    help = 'Send WhatsApp reminders for finances, classes, tasks and monthly focus.'
 
     def handle(self, *args, **options):
-        today = datetime.date.today()
+        today = timezone.localdate()
+        now = timezone.localtime()
         self.stdout.write(f'[{today}] Checking WhatsApp notifications...')
 
         for user in User.objects.filter(is_active=True):
@@ -37,6 +42,8 @@ class Command(BaseCommand):
         for user in users:
             self._notify_recurring_expenses(user, today)
             self._notify_credit_cards(user, today)
+            self._notify_life_daily_summary(user, today, now)
+            self._notify_life_events(user, today, now)
 
         self.stdout.write('Done.')
 
@@ -89,7 +96,14 @@ class Command(BaseCommand):
                     f'({due_date.strftime("%d/%m/%Y")}) por ${float(expense.amount):,.2f}.\n'
                     f'Entra a FinanceFlow para registrarlo.'
                 )
-                self._send_callmebot(user, message, f'{expense.name} payment', days_until)
+                self._send_once(
+                    user,
+                    message,
+                    f'{expense.name} payment',
+                    f'finance:recurring-expense:{expense.id}:{days_until}',
+                    due_date,
+                    days_until,
+                )
 
     def _notify_credit_cards(self, user, today):
         cards = Account.objects.filter(user=user, is_active=True, type='CREDIT')
@@ -118,7 +132,14 @@ class Command(BaseCommand):
             f'({event_date.strftime("%d/%m/%Y")}).\n'
             f'Compras estimadas en ese corte: ${float(cut_amount):,.2f}.'
         )
-        self._send_callmebot(user, message, f'{card.name} corte', days_until)
+        self._send_once(
+            user,
+            message,
+            f'{card.name} corte',
+            f'finance:card-cut:{card.id}:{days_until}',
+            event_date,
+            days_until,
+        )
 
     def _maybe_send_card_payment(self, user, card, today):
         bucket = next_pending_credit_bucket(user, card, today)
@@ -136,7 +157,166 @@ class Command(BaseCommand):
             f'({event_date.strftime("%d/%m/%Y")}).\n'
             f'Monto pendiente del estado: ${float(bucket["pending"]):,.2f}.'
         )
-        self._send_callmebot(user, message, f'{card.name} pago', days_until)
+        self._send_once(
+            user,
+            message,
+            f'{card.name} pago',
+            f'finance:card-payment:{card.id}:{event_date}:{days_until}',
+            event_date,
+            days_until,
+        )
+
+    def _notify_life_daily_summary(self, user, today, now):
+        if now.hour not in DAILY_SUMMARY_HOURS:
+            return
+
+        summary = build_month_summary(user)
+        counts = summary['counts']
+        lines = [
+            '*Resumen de Mi Mes*',
+            f'Hoy: {counts["active_students"]} alumnos activos, {counts["open_tasks"]} pendientes abiertos.',
+            f'Para hoy: {len(summary["today_lessons"])} clases y {len(summary["today_tasks"])} tareas.',
+        ]
+
+        if counts['overdue_tasks']:
+            lines.append(f'Urgente: {counts["overdue_tasks"]} tareas vencidas.')
+        if counts['follow_up_students']:
+            lines.append(f'Alumnos por seguir: {counts["follow_up_students"]}.')
+
+        first_lesson = summary['today_lessons'][0] if summary['today_lessons'] else None
+        if first_lesson:
+            lines.append(f'Primera clase: {first_lesson.student.name} a las {timezone.localtime(first_lesson.scheduled_at).strftime("%H:%M")}.')
+
+        first_task = summary['today_tasks'][0] if summary['today_tasks'] else None
+        if first_task:
+            lines.append(f'Pendiente clave: {first_task.title}.')
+
+        focus = summary['focus']
+        if focus.company_focus:
+            lines.append(f'Empresa: {self._trim(focus.company_focus)}')
+        elif focus.skills_focus:
+            lines.append(f'Habilidad: {self._trim(focus.skills_focus)}')
+
+        self._send_once(
+            user,
+            '\n'.join(lines),
+            'Mi Mes daily summary',
+            'life:daily-summary',
+            today,
+            0,
+        )
+
+    def _notify_life_events(self, user, today, now):
+        self._notify_lesson_reminders(user, now)
+        self._notify_task_reminders(user, today, now)
+        self._notify_student_followups(user, today)
+
+    def _notify_lesson_reminders(self, user, now):
+        lessons = Lesson.objects.filter(
+            user=user,
+            status='SCHEDULED',
+            reminder_enabled=True,
+            scheduled_at__gte=now,
+            scheduled_at__lte=now + datetime.timedelta(days=2),
+        ).select_related('student')
+
+        for lesson in lessons:
+            reminder_at = lesson.scheduled_at - datetime.timedelta(minutes=lesson.reminder_minutes or 0)
+            if now < reminder_at:
+                continue
+
+            local_time = timezone.localtime(lesson.scheduled_at)
+            message = (
+                f'*Clase proxima*\n'
+                f'{lesson.student.name} - {lesson.topic}\n'
+                f'{local_time.strftime("%d/%m/%Y %H:%M")}\n'
+            )
+            if lesson.homework:
+                message += f'Seguimiento: {self._trim(lesson.homework)}'
+
+            self._send_once(
+                user,
+                message,
+                f'lesson {lesson.id}',
+                f'life:lesson:{lesson.id}:reminder',
+                local_time.date(),
+                0,
+            )
+
+    def _notify_task_reminders(self, user, today, now):
+        tasks = WorkTask.objects.filter(
+            user=user,
+            status__in=['PENDING', 'IN_PROGRESS'],
+            due_at__isnull=False,
+        )
+
+        for task in tasks:
+            local_due = timezone.localtime(task.due_at)
+            if task.due_at < now:
+                message = (
+                    f'*Tarea vencida*\n'
+                    f'{task.title}\n'
+                    f'Vencia: {local_due.strftime("%d/%m/%Y %H:%M")}\n'
+                    f'Prioridad: {task.get_priority_display()}'
+                )
+                self._send_once(
+                    user,
+                    message,
+                    f'overdue task {task.id}',
+                    f'life:task:{task.id}:overdue',
+                    today,
+                    0,
+                )
+                continue
+
+            if not task.reminder_enabled:
+                continue
+
+            reminder_at = task.due_at - datetime.timedelta(minutes=task.reminder_minutes or 0)
+            if now < reminder_at:
+                continue
+
+            message = (
+                f'*Tarea proxima*\n'
+                f'{task.title}\n'
+                f'Vence: {local_due.strftime("%d/%m/%Y %H:%M")}\n'
+                f'Area: {task.get_area_display()}'
+            )
+            self._send_once(
+                user,
+                message,
+                f'task {task.id}',
+                f'life:task:{task.id}:reminder',
+                local_due.date(),
+                0,
+            )
+
+    def _notify_student_followups(self, user, today):
+        students = Student.objects.filter(
+            user=user,
+            status='ACTIVE',
+            next_follow_up__isnull=False,
+            next_follow_up__lte=today,
+        ).order_by('next_follow_up', 'name')
+
+        for student in students:
+            message = (
+                f'*Seguimiento de alumno*\n'
+                f'{student.name}'
+            )
+            if student.subject:
+                message += f' - {student.subject}'
+            if student.goal:
+                message += f'\nObjetivo: {self._trim(student.goal)}'
+
+            self._send_once(
+                user,
+                message,
+                f'student follow-up {student.id}',
+                f'life:student:{student.id}:follow-up',
+                today,
+                0,
+            )
 
     def _next_date_for_day(self, day, today):
         if not day:
@@ -161,6 +341,31 @@ class Command(BaseCommand):
             return 'manana'
         return f'en {days_until} dias'
 
+    def _trim(self, value, length=90):
+        clean = ' '.join((value or '').split())
+        if len(clean) <= length:
+            return clean
+        return f'{clean[:length - 3]}...'
+
+    def _send_once(self, user, message, label, event_key, event_date, days_until):
+        exists = NotificationLog.objects.filter(
+            user=user,
+            channel='WHATSAPP',
+            event_key=event_key,
+            event_date=event_date,
+        ).exists()
+        if exists:
+            self.stdout.write(f'  [SKIP] {user.username} -> {label} already sent')
+            return
+
+        if self._send_callmebot(user, message, label, days_until):
+            NotificationLog.objects.get_or_create(
+                user=user,
+                channel='WHATSAPP',
+                event_key=event_key,
+                event_date=event_date,
+            )
+
     def _send_callmebot(self, user, message, label, days_until):
         try:
             resp = http_requests.get(
@@ -174,5 +379,7 @@ class Command(BaseCommand):
             )
             status = 'OK' if resp.status_code == 200 else f'ERROR {resp.status_code}'
             self.stdout.write(f'  [{status}] {user.username} -> {label} ({self._days_text(days_until)})')
+            return resp.status_code == 200
         except http_requests.exceptions.RequestException as exc:
             self.stdout.write(f'  [FAIL] {user.username} -> {label}: {exc}')
+            return False
