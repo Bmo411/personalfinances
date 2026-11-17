@@ -12,7 +12,11 @@ def send_whatsapp(user, message, phone=None, apikey=None):
                 'phone': str(phone).strip().replace('+', ''), 'text': message, 'apikey': str(apikey).strip(),
             }, timeout=15)
             body = response.text.lower()
-            if response.status_code in (400, 401, 403) or any(word in body for word in ('invalid apikey', 'invalid api key', 'not activated', 'not authorized')):
+            if any(message in body for message in ('you have 0 messages left', 'quota exceeded', 'credits exhausted')):
+                status, error = 'QUOTA_EXHAUSTED', 'CallMeBot informó que el cupo de mensajes está agotado.'
+            elif response.status_code == 429:
+                status, error = 'RATE_LIMITED', 'CallMeBot alcanzó un límite de envío. Intenta más tarde.'
+            elif response.status_code in (400, 401, 403) or any(word in body for word in ('invalid apikey', 'invalid api key', 'not activated', 'not authorized')):
                 status, error = 'CONFIG_REQUIRED', 'CallMeBot rechazó la configuración. Revisa la clave y la activación.'
             elif response.status_code == 200 and 'error' not in body:
                 status, error = 'ACCEPTED', ''

@@ -156,6 +156,18 @@ class IntegrationTests(APITestCase):
         self.assertEqual(profile['whatsapp_status'], 'CONFIG_REQUIRED')
         self.assertNotIn('whatsapp_apikey', profile)
 
+    @patch('users.whatsapp.requests.get')
+    def test_exhausted_whatsapp_quota_is_not_reported_as_accepted(self, get):
+        from users.whatsapp import send_whatsapp
+        self.user.whatsapp_phone = '+520000000000'
+        self.user.whatsapp_apikey = 'test-secret'
+        get.return_value.status_code = 200
+        get.return_value.text = 'You have 0 messages left'
+        self.assertEqual(send_whatsapp(self.user, 'Test')[0], 'QUOTA_EXHAUSTED')
+        get.return_value.status_code = 429
+        get.return_value.text = 'Too many requests'
+        self.assertEqual(send_whatsapp(self.user, 'Test')[0], 'RATE_LIMITED')
+
     def test_schema_reports_nested_workout_fields(self):
         response = self.client.options('/api/integrations/records/workouts/')
         self.assertEqual(response.status_code, 200)
