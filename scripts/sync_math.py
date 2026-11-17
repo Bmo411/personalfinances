@@ -50,7 +50,7 @@ def main():
     if not args.url.startswith('https://') and not args.url.startswith(('http://127.0.0.1:', 'http://localhost:')):
         raise ValueError('La URL remota debe usar HTTPS.')
     identity = uuid.uuid4()
-    request = urllib.request.Request(args.url.rstrip('/') + '/api/integrations/math/sync/', data=encoded, headers={'Content-Type': 'application/json', 'Authorization': f'Bearer {key}', 'Idempotency-Key': str(identity)})
+    request = urllib.request.Request(args.url.rstrip('/') + '/api/integrations/math/sync/', data=encoded, headers={'Content-Type': 'application/json', 'User-Agent': 'LifeGuide-MathSync/1.0', 'Authorization': f'Bearer {key}', 'Idempotency-Key': str(identity)})
     try:
         with urllib.request.urlopen(request, timeout=30) as response:
             result = json.load(response)

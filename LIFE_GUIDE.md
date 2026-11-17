@@ -18,6 +18,8 @@ url = "https://finance.blueberrieslab.com/mcp"
 bearer_token_env_var = "LIFE_GUIDE_API_KEY"
 ```
 
+Si Codex ya estaba abierto al configurar la variable, `scripts/mcp_headers.ps1` puede leerla del entorno de usuario mediante `http_headers_helper`. El auxiliar devuelve el encabezado a Codex sin guardar la clave en TOML.
+
 El MCP ofrece esquemas, consulta de registros y resúmenes, creación y edición. Una escritura requiere `request_id` UUID, reutilizado para cualquier reintento. Los lotes financieros deben pasar por `preview_import`, presentar filas, advertencias y totales, y esperar confirmación antes de `confirm_import`. Confirmar el mismo borrador devuelve los mismos IDs; la transacción se revierte entera ante un fallo.
 
 ## Matemáticas
