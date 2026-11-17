@@ -220,7 +220,11 @@ export interface UserProfile {
     username: string;
     email: string;
     whatsapp_phone: string | null;
-    whatsapp_apikey: string | null;
+    whatsapp_apikey?: string | null;
+    whatsapp_key_configured: boolean;
+    whatsapp_status: string;
+    meditation_reminder_enabled: boolean;
+    meditation_reminder_time: string;
     whatsapp_enabled: boolean;
 }
 

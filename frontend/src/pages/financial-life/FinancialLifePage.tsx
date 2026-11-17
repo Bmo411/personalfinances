@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Brain, Briefcase, CheckCircle2, Circle, Clock, Compass, Target, Trophy, UserRound, Wallet2 } from 'lucide-react';
 import { financeService } from '../../services/finance';
 
-const currencyFormatter = new Intl.NumberFormat('en-US', {
+const currencyFormatter = new Intl.NumberFormat('es-MX', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
 });

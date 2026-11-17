@@ -1,4 +1,3 @@
-import requests as http_requests
 from rest_framework import generics
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -31,30 +30,13 @@ class WhatsAppTestView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        # Read from request body (frontend sends them directly - safer than URL params)
-        phone = request.data.get('phone') or getattr(request.user, 'whatsapp_phone', None)
-        apikey = request.data.get('apikey') or getattr(request.user, 'whatsapp_apikey', None)
-
-        if not phone or not apikey:
-            return Response({'error': 'Configura tu número y API key primero.'}, status=400)
-
-        message = '✅ Conexión exitosa con tu app de finanzas. Las notificaciones de gastos fijos están activas.'
-        
-        try:
-            resp = http_requests.get(
-                'https://api.callmebot.com/whatsapp.php',
-                params={
-                    'phone': str(phone).strip().replace('+', ''),
-                    'text': message,
-                    'apikey': str(apikey).strip(),
-                },
-                timeout=15
-            )
-            if resp.status_code == 200:
-                return Response({'message': 'Mensaje enviado correctamente. Deberías recibirlo en unos segundos.'})
-            else:
-                return Response({'error': f'CallMeBot respondió con error {resp.status_code}: {resp.text[:200]}'}, status=502)
-        except http_requests.exceptions.Timeout:
-            return Response({'error': 'Tiempo de espera agotado al contactar CallMeBot.'}, status=504)
-        except http_requests.exceptions.RequestException as e:
-            return Response({'error': f'No se pudo conectar con CallMeBot: {str(e)}'}, status=502)
+        from .whatsapp import send_whatsapp
+        result, error = send_whatsapp(
+            request.user,
+            'Tu guía de vida está conectada. Este es un mensaje de prueba.',
+            phone=request.data.get('phone'),
+            apikey=request.data.get('apikey'),
+        )
+        if result == 'ACCEPTED':
+            return Response({'status': result, 'message': 'CallMeBot aceptó el envío. Comprueba la recepción en WhatsApp.'})
+        return Response({'status': result, 'error': error}, status=502)

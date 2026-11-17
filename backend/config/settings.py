@@ -24,12 +24,23 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-2z8xwuh1u7o89a9@6q5+hib67x02s9f(uv$p3k8@igd7())-zj'
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', '')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'True') == 'True'
+if not SECRET_KEY:
+    if not DEBUG:
+        raise RuntimeError('Configura DJANGO_SECRET_KEY antes de iniciar producción.')
+    SECRET_KEY = 'local-development-only-life-guide-key'
 
-ALLOWED_HOSTS = (os.environ.get('ALLOWED_HOSTS') or '*').split(',')
+PUBLIC_URL = os.environ.get('PUBLIC_URL', 'https://finance.blueberrieslab.com').rstrip('/')
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+CSRF_TRUSTED_ORIGINS = [PUBLIC_URL]
+
+ALLOWED_HOSTS = [host.strip() for host in (os.environ.get('ALLOWED_HOSTS') or 'finance.blueberrieslab.com').split(',') if host.strip()]
+ALLOWED_HOSTS += ['backend', 'localhost', '127.0.0.1', 'testserver'] if DEBUG else ['backend', 'localhost', '127.0.0.1']
 
 
 # Application definition
@@ -47,6 +58,7 @@ INSTALLED_APPS = [
     'users',
     'finance',
     'life',
+    'integrations',
 ]
 
 MIDDLEWARE = [
@@ -88,7 +100,7 @@ if os.environ.get('USE_SQLITE', 'False') == 'True':
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
+            'NAME': os.environ.get('SQLITE_PATH') or BASE_DIR / 'db.sqlite3',
         }
     }
 else:

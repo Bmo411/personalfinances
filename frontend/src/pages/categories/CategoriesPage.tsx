@@ -100,7 +100,7 @@ export function CategoriesPage() {
                                         ))}
                                     </Pie>
                                     <Tooltip
-                                        formatter={(value: number | string | undefined, name: string | undefined) => [`$${Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, name || 'Total']}
+                                        formatter={(value: number | string | undefined, name: string | undefined) => [`$${Number(value || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}`, name || 'Total']}
                                         contentStyle={{ borderRadius: '12px', border: '1px solid var(--brand-200)', backgroundColor: 'var(--bg-main)', color: 'var(--text-primary)' }}
                                     />
                                     <Legend />

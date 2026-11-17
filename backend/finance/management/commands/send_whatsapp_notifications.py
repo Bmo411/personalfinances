@@ -2,10 +2,11 @@ import calendar
 import datetime
 from decimal import Decimal
 
-import requests as http_requests
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.utils import timezone
+from django.db import transaction as db_transaction
+from life.notifications import send_meditation_reminder
 
 from finance.credit_cards import build_credit_card_buckets, next_pending_credit_bucket
 from finance.models import Account, RecurringExpense, RecurringIncome, Transaction
@@ -28,6 +29,7 @@ class Command(BaseCommand):
 
         for user in User.objects.filter(is_active=True):
             self._process_recurring_incomes(user, today)
+            send_meditation_reminder(user, now)
 
         users = User.objects.filter(
             whatsapp_enabled=True,
@@ -47,8 +49,9 @@ class Command(BaseCommand):
 
         self.stdout.write('Done.')
 
+    @db_transaction.atomic
     def _process_recurring_incomes(self, user, today):
-        incomes = RecurringIncome.objects.filter(user=user, is_active=True, auto_create=True)
+        incomes = RecurringIncome.objects.select_for_update().filter(user=user, is_active=True, auto_create=True)
 
         for income in incomes:
             due_date = self._next_date_for_day(income.due_day, today)
@@ -348,38 +351,22 @@ class Command(BaseCommand):
         return f'{clean[:length - 3]}...'
 
     def _send_once(self, user, message, label, event_key, event_date, days_until):
-        exists = NotificationLog.objects.filter(
+        log, claimed = NotificationLog.objects.get_or_create(
             user=user,
             channel='WHATSAPP',
             event_key=event_key,
             event_date=event_date,
-        ).exists()
-        if exists:
+            defaults={'status': 'PENDING'},
+        )
+        if not claimed:
             self.stdout.write(f'  [SKIP] {user.username} -> {label} already sent')
             return
 
-        if self._send_callmebot(user, message, label, days_until):
-            NotificationLog.objects.get_or_create(
-                user=user,
-                channel='WHATSAPP',
-                event_key=event_key,
-                event_date=event_date,
-            )
+        log.status = 'ACCEPTED' if self._send_callmebot(user, message, label, days_until) else 'FAILED'
+        log.save(update_fields=['status'])
 
     def _send_callmebot(self, user, message, label, days_until):
-        try:
-            resp = http_requests.get(
-                'https://api.callmebot.com/whatsapp.php',
-                params={
-                    'phone': user.whatsapp_phone.strip().replace('+', ''),
-                    'text': message,
-                    'apikey': user.whatsapp_apikey.strip(),
-                },
-                timeout=15,
-            )
-            status = 'OK' if resp.status_code == 200 else f'ERROR {resp.status_code}'
-            self.stdout.write(f'  [{status}] {user.username} -> {label} ({self._days_text(days_until)})')
-            return resp.status_code == 200
-        except http_requests.exceptions.RequestException as exc:
-            self.stdout.write(f'  [FAIL] {user.username} -> {label}: {exc}')
-            return False
+        from users.whatsapp import send_whatsapp
+        status, error = send_whatsapp(user, message)
+        self.stdout.write(f'  [{status}] reminder={label}')
+        return status == 'ACCEPTED'

@@ -1,53 +1,18 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-type Theme = 'light' | 'dark' | 'ocean';
+type Theme = 'light' | 'dark';
+const apply = (theme: Theme) => {
+    document.documentElement.classList.remove('theme-dark', 'theme-light', 'theme-ocean');
+    document.documentElement.classList.add(`theme-${theme}`);
+};
+export const useThemeStore = create<{ theme: Theme; setTheme: (theme: Theme) => void }>()(persist((set) => ({
+    theme: 'dark', setTheme: theme => { apply(theme); set({ theme }); },
+}), { name: 'ui-theme-storage', version: 2, migrate: () => ({ theme: 'dark' }) }));
 
-interface ThemeState {
-    theme: Theme;
-    setTheme: (theme: Theme) => void;
-}
-
-export const useThemeStore = create<ThemeState>()(
-    persist(
-        (set) => ({
-            theme: 'light',
-            setTheme: (theme) => {
-                const root = window.document.documentElement;
-
-                // Remove existing theme classes
-                root.classList.remove('theme-dark', 'theme-ocean');
-
-                // Add new theme class if not default (light)
-                if (theme !== 'light') {
-                    root.classList.add(`theme-${theme}`);
-                }
-
-                set({ theme });
-            },
-        }),
-        {
-            name: 'ui-theme-storage',
-        }
-    )
-);
-
-// Helper script to inject on page load to prevent flash of wrong theme
 export const initializeTheme = () => {
-    const rawData = localStorage.getItem('ui-theme-storage');
-    if (rawData) {
-        try {
-            const parsed = JSON.parse(rawData);
-            const theme = parsed.state.theme;
-
-            const root = window.document.documentElement;
-            root.classList.remove('theme-dark', 'theme-ocean');
-
-            if (theme !== 'light') {
-                root.classList.add(`theme-${theme}`);
-            }
-        } catch (e) {
-            console.error('Error parsing theme state', e);
-        }
-    }
+    try {
+        const saved = JSON.parse(localStorage.getItem('ui-theme-storage') || '{}');
+        apply(saved.version === 2 && saved.state?.theme === 'light' ? 'light' : 'dark');
+    } catch { apply('dark'); }
 };

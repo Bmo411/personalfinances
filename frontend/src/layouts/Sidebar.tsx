@@ -1,75 +1,22 @@
-import { Link, useLocation } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
-import { Wallet2, LayoutDashboard, History, PiggyBank, LogOut, Settings, Target, Users, CalendarClock, CreditCard, Compass, CalendarDays } from 'lucide-react';
-import { clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { Sun, Wallet, CalendarDays, FolderKanban, GraduationCap, Dumbbell, Flower2, Settings, Plug, LogOut, ArrowUpRight } from 'lucide-react';
 
-// Helper temporal
-function cn(...inputs: (string | undefined | null | false)[]) {
-    return twMerge(clsx(inputs));
-}
-
-const navItems = [
-    { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
-    { icon: Compass, label: 'Mi vida', path: '/financial-life' },
-    { icon: CalendarDays, label: 'Mi Mes', path: '/month' },
-    { icon: Wallet2, label: 'Cuentas', path: '/accounts' },
-    { icon: CreditCard, label: 'Tarjetas', path: '/credit-cards' },
-    { icon: CalendarClock, label: 'Fijos', path: '/recurring' },
-    { icon: History, label: 'Historial', path: '/history' },
-    { icon: PiggyBank, label: 'Categorías', path: '/categories' },
-    { icon: Target, label: 'Ahorros', path: '/savings' },
-    { icon: Users, label: 'Deudas', path: '/debts' },
-    { icon: Settings, label: 'Preferencias', path: '/preferences' },
+const navigation = [
+    { icon: Sun, label: 'Hoy', path: '/' },
+    { icon: Wallet, label: 'Finanzas', path: '/finance' },
+    { icon: FolderKanban, label: 'Organización', path: '/organization' },
+    { icon: CalendarDays, label: 'Mi mes', path: '/month' },
+    { icon: GraduationCap, label: 'Clases', path: '/math' },
+    { icon: Dumbbell, label: 'Gym y dieta', path: '/health' },
+    { icon: Flower2, label: 'Meditación', path: '/meditation' },
 ];
 
-export function Sidebar({ isOpen, onClose }: { isOpen?: boolean, onClose?: () => void }) {
-    const location = useLocation();
+export function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () => void }) {
     const logout = useAuthStore(state => state.logout);
-
-    return (
-        <aside className={cn(
-            "w-64 bg-[var(--bg-secondary)] border-r border-brand-200 h-screen flex flex-col fixed left-0 top-0 transition-transform duration-300 z-40",
-            isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
-        )}>
-            <div className="p-6">
-                <h1 className="text-2xl font-bold flex items-center gap-2 text-[var(--text-primary)]">
-                    <Wallet2 className="text-brand-700" size={28} />
-                    FinanceFlow
-                </h1>
-            </div>
-
-            <nav className="flex-1 px-4 mt-6 space-y-2 overflow-y-auto pb-6">
-                {navItems.map((item) => {
-                    const isActive = location.pathname === item.path;
-                    return (
-                        <Link
-                            key={item.path}
-                            to={item.path}
-                            onClick={onClose}
-                            className={cn(
-                                "flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-medium",
-                                isActive
-                                    ? "bg-brand-500 text-white shadow-sm"
-                                    : "text-brand-700 hover:bg-[var(--bg-hover)] hover:text-brand-900"
-                            )}
-                        >
-                            <item.icon size={20} />
-                            {item.label}
-                        </Link>
-                    );
-                })}
-            </nav>
-
-            <div className="p-4 border-t border-brand-200">
-                <button
-                    onClick={logout}
-                    className="flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-medium w-full text-brand-700 hover:bg-red-50 hover:text-red-600"
-                >
-                    <LogOut size={20} />
-                    Cerrar Sesión
-                </button>
-            </div>
-        </aside>
-    );
+    return <aside className={`guide-sidebar ${isOpen ? 'is-open' : ''}`}>
+        <NavLink className="guide-brand" to="/" onClick={onClose}><span><Sun size={25} strokeWidth={1.4} /></span><div>Mi guía<small>VIDA EN PERSPECTIVA</small></div></NavLink>
+        <nav aria-label="Navegación principal">{navigation.map(item => <NavLink key={item.path} end={item.path === '/'} to={item.path} onClick={onClose} className={({ isActive }) => `nav-item ${isActive ? 'is-active' : ''}`}><item.icon size={19} strokeWidth={1.6} />{item.label}</NavLink>)}</nav>
+        <div className="sidebar-footer"><NavLink className="nav-item" to="/integrations" onClick={onClose}><Plug size={18} />Integraciones<ArrowUpRight size={14} className="ml-auto" /></NavLink><NavLink className="nav-item" to="/preferences" onClick={onClose}><Settings size={18} />Preferencias</NavLink><button className="nav-item w-full" onClick={logout}><LogOut size={18} />Cerrar sesión</button></div>
+    </aside>;
 }

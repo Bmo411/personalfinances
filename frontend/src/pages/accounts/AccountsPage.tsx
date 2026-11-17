@@ -68,7 +68,7 @@ export function AccountsPage() {
                 <div className="md:col-span-2 bg-gradient-to-r from-brand-700 to-brand-900 text-white rounded-2xl p-6 shadow-sm flex flex-col justify-center">
                     <h2 className="text-brand-100 font-medium mb-1">Liquidez disponible</h2>
                     <p className="text-4xl font-bold">
-                        ${liquidTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        ${liquidTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
                     </p>
                 </div>
 
@@ -77,7 +77,7 @@ export function AccountsPage() {
                         <Wallet size={18} /> Patrimonio neto
                     </div>
                     <p className="text-xl font-bold text-[var(--text-primary)]">
-                        ${netTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        ${netTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
                     </p>
                 </div>
 
@@ -86,7 +86,7 @@ export function AccountsPage() {
                         <Landmark size={18} /> Bancos
                     </div>
                     <p className="text-xl font-bold text-[var(--text-primary)]">
-                        ${totalBank.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        ${totalBank.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
                     </p>
                 </div>
 
@@ -95,7 +95,7 @@ export function AccountsPage() {
                         <Wallet size={18} /> Efectivo
                     </div>
                     <p className="text-xl font-bold text-[var(--text-primary)]">
-                        ${totalCash.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        ${totalCash.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
                     </p>
                 </div>
 
@@ -104,7 +104,7 @@ export function AccountsPage() {
                         <Loader2 size={18} /> Inversiones
                     </div>
                     <p className="text-xl font-bold text-[var(--text-primary)]">
-                        ${totalSavings.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        ${totalSavings.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
                     </p>
                 </div>
 
@@ -113,7 +113,7 @@ export function AccountsPage() {
                         <CreditCard size={18} /> Tarjetas
                     </div>
                     <p className="text-xl font-bold text-red-500">
-                        ${totalCreditDebt.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        ${totalCreditDebt.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
                     </p>
                 </div>
             </div>
@@ -159,11 +159,11 @@ export function AccountsPage() {
                                     <div>
                                         <p className="text-xs text-[var(--text-secondary)] mb-1">{isCredit ? 'Deuda Actual' : 'Balance Actual'}</p>
                                         <p className={`text-2xl font-bold ${isCredit ? 'text-red-500' : 'text-brand-700'}`}>
-                                            ${displayBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                            ${displayBalance.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
                                         </p>
                                         {isCredit && creditLimit > 0 && (
                                             <p className="text-xs text-[var(--text-secondary)] mt-1">
-                                                Disponible: ${availableCredit.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                                Disponible: ${availableCredit.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
                                             </p>
                                         )}
                                     </div>

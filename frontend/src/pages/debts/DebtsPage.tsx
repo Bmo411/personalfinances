@@ -9,9 +9,9 @@ type EnrichedAccount = Account & { calculated_balance: number };
 function formatAccountBalance(account: EnrichedAccount) {
     const balance = Number(account.calculated_balance);
     if (account.type === 'CREDIT') {
-        return `Deuda $${Math.max(0, -balance).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+        return `Deuda $${Math.max(0, -balance).toLocaleString('es-MX', { minimumFractionDigits: 2 })}`;
     }
-    return `$${balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+    return `$${balance.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`;
 }
 
 export function DebtsPage() {
@@ -71,7 +71,7 @@ export function DebtsPage() {
                 >
                     <h2 className="text-[var(--text-secondary)] font-medium mb-2">Total que debo pagar</h2>
                     <p className="text-4xl font-bold text-red-500">
-                        ${totalIOwe.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        ${totalIOwe.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
                     </p>
                 </div>
 
@@ -81,7 +81,7 @@ export function DebtsPage() {
                 >
                     <h2 className="text-[var(--text-secondary)] font-medium mb-2">Total por cobrar</h2>
                     <p className="text-4xl font-bold text-brand-600">
-                        ${totalOwedToMe.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        ${totalOwedToMe.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
                     </p>
                 </div>
             </div>
@@ -118,10 +118,10 @@ export function DebtsPage() {
                                 <p className="text-sm text-[var(--text-secondary)] mb-1">Restante / Original</p>
                                 <div className="flex items-baseline gap-2 sm:justify-end">
                                     <span className={`text-2xl font-bold ${debt.is_settled ? 'text-[var(--text-secondary)]' : (activeTab === 'I_OWE' ? 'text-red-500' : 'text-brand-600')}`}>
-                                        ${Number(debt.remaining_amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                        ${Number(debt.remaining_amount).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
                                     </span>
                                     <span className="text-sm text-[var(--text-secondary)]">
-                                        / ${Number(debt.total_amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                        / ${Number(debt.total_amount).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
                                     </span>
                                 </div>
                             </div>
@@ -299,7 +299,7 @@ function PaymentForm({ debt, onSuccess }: { debt: Debt, onSuccess: () => void })
         <form onSubmit={handleSubmit} className="space-y-4">
             <div className="bg-brand-50 p-4 rounded-xl text-center mb-4 border border-brand-200">
                 <p className="text-sm text-brand-700">Restante a pagar de {debt.name}</p>
-                <p className="text-2xl font-bold text-brand-900">${remaining.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+                <p className="text-2xl font-bold text-brand-900">${remaining.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</p>
             </div>
 
             <div>

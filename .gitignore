@@ -41,3 +41,6 @@ dist-ssr/
 .vscode/
 .idea/
 *.swp
+
+# Local verification and credentials
+.runtime/

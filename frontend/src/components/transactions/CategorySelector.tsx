@@ -64,12 +64,12 @@ export function CategorySelector({ type, value, onChange }: CategorySelectorProp
             <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">Categoría</label>
 
             <div
-                onClick={() => setIsOpen(true)}
                 className="w-full px-4 py-3 rounded-xl border border-brand-200 bg-[var(--bg-main)] text-[var(--text-primary)] cursor-text flex items-center justify-between"
             >
                 {isOpen ? (
                     <input
                         autoFocus
+                        aria-label="Buscar Categoría"
                         type="text"
                         value={search}
                         onChange={e => setSearch(e.target.value)}
@@ -77,9 +77,9 @@ export function CategorySelector({ type, value, onChange }: CategorySelectorProp
                         placeholder="Buscar o crear categoría..."
                     />
                 ) : (
-                    <span className={selectedCat ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}>
+                    <button type="button" aria-label="Seleccionar Categoría" aria-expanded={false} onClick={() => setIsOpen(true)} className="w-full text-left"><span className={selectedCat ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}>
                         {selectedCat ? selectedCat.name : 'Seleccionar categoría...'}
-                    </span>
+                    </span></button>
                 )}
             </div>
 

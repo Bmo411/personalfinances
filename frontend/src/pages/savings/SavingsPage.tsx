@@ -121,9 +121,9 @@ export function SavingsPage() {
                         <div className="h-full bg-green-600 rounded-full transition-all" style={{ width: `${emergencyPercent}%` }} />
                     </div>
                     <div className="flex justify-between gap-3 mt-2 text-sm text-[var(--text-secondary)]">
-                        <span>${emergencyCurrent.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                        <span>${emergencyCurrent.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span>
                         <span>{emergencyPercent.toFixed(0)}%</span>
-                        <span>${emergencyTarget.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                        <span>${emergencyTarget.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span>
                     </div>
                 </div>
             </div>
@@ -137,7 +137,7 @@ export function SavingsPage() {
                     <div>
                         <h2 className="text-[var(--text-secondary)] font-medium">Ahorro y Metas Acumuladas</h2>
                         <p className="text-4xl font-bold text-[var(--text-primary)]">
-                            ${(totalSaved + savingsAccounts.reduce((sum, a) => sum + Number(a.calculated_balance), 0)).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                            ${(totalSaved + savingsAccounts.reduce((sum, a) => sum + Number(a.calculated_balance), 0)).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
                         </p>
                     </div>
                 </div>
@@ -145,7 +145,7 @@ export function SavingsPage() {
                 <div className="bg-[var(--bg-secondary)] rounded-2xl p-6 shadow-sm border border-brand-200 flex flex-col justify-center">
                     <h2 className="text-[var(--text-secondary)] font-medium">Restante para Gastos (Disponible)</h2>
                     <p className="text-3xl font-bold text-brand-700">
-                        ${availableBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        ${availableBalance.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
                     </p>
                     <p className="text-xs text-[var(--text-secondary)] mt-1">
                         No incluye lineas de credito ni inversiones separadas.
@@ -175,7 +175,7 @@ export function SavingsPage() {
                                     <div>
                                         <p className="text-xs text-[var(--text-secondary)] mb-1">Balance Actual</p>
                                         <p className="text-2xl font-bold text-brand-700">
-                                            ${Number(account.calculated_balance).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                            ${Number(account.calculated_balance).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
                                         </p>
                                     </div>
                                 </div>
@@ -213,10 +213,10 @@ export function SavingsPage() {
 
                                 <div className="mt-4 mb-2 flex justify-between items-end">
                                     <div className="text-2xl font-bold text-[var(--text-primary)]">
-                                        ${current.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                        ${current.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
                                     </div>
                                     <div className="text-sm text-[var(--text-secondary)]">
-                                        de ${target.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                        de ${target.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
                                     </div>
                                 </div>
 

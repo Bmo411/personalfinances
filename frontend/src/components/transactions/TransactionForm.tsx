@@ -1,3 +1,4 @@
+import { localDate, errorMessage } from '../../services/guide';
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { financeService } from '../../services/finance';
@@ -24,12 +25,13 @@ const spendingOptions: { value: SpendingKind; label: string; description: string
 export function TransactionForm({ onSuccess }: TransactionFormProps) {
     const [type, setType] = useState<'IN' | 'OUT' | 'TRANSFER'>('OUT');
     const [amount, setAmount] = useState('');
-    const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+    const [date, setDate] = useState(localDate());
     const [accountId, setAccountId] = useState<number | null>(null);
     const [toAccountId, setToAccountId] = useState<number | null>(null);
     const [categoryId, setCategoryId] = useState<number | null>(null);
     const [spendingKind, setSpendingKind] = useState<SpendingKind>('NECESSARY');
     const [description, setDescription] = useState('');
+    const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'CARD' | 'TRANSFER'>('CASH');
 
     const queryClient = useQueryClient();
 
@@ -40,6 +42,7 @@ export function TransactionForm({ onSuccess }: TransactionFormProps) {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['transactions'] });
             queryClient.invalidateQueries({ queryKey: ['summary'] });
+            queryClient.invalidateQueries({ queryKey: ['accounts'] });
             onSuccess();
         }
     });
@@ -65,7 +68,7 @@ export function TransactionForm({ onSuccess }: TransactionFormProps) {
                 account: accountId,
                 category: categoryId,
                 description,
-                payment_method: 'CASH', // Default for now, can be expanded
+                payment_method: paymentMethod,
                 spending_kind: type === 'OUT' ? spendingKind : null,
             });
         }
@@ -77,6 +80,8 @@ export function TransactionForm({ onSuccess }: TransactionFormProps) {
 
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
+            {mutation.isError && <p role="alert" className="form-error">{errorMessage(mutation.error)}</p>}
+            {type !== 'TRANSFER' && <label className="field">Método de pago<select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value as 'CASH' | 'CARD' | 'TRANSFER')}><option value="CASH">Efectivo</option><option value="CARD">Tarjeta</option><option value="TRANSFER">Transferencia</option></select></label>}
             {/* Selector de Tipo */}
             <div className="flex bg-[var(--bg-hover)] p-1 rounded-xl">
                 <button
@@ -110,8 +115,9 @@ export function TransactionForm({ onSuccess }: TransactionFormProps) {
                     <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">Monto ($)</label>
                     <input
                         type="number"
+                        aria-label="Monto ($)"
                         step="0.01"
-                        min="0"
+                        min="0.01"
                         value={amount}
                         onChange={e => setAmount(e.target.value)}
                         className="w-full px-4 py-3 rounded-xl border border-brand-200 focus:outline-none focus:ring-2 focus:ring-brand-500 bg-[var(--bg-main)] text-[var(--text-primary)]"
@@ -123,6 +129,7 @@ export function TransactionForm({ onSuccess }: TransactionFormProps) {
                     <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">Fecha</label>
                     <input
                         type="date"
+                        aria-label="Fecha"
                         value={date}
                         onChange={e => setDate(e.target.value)}
                         className="w-full px-4 py-3 rounded-xl border border-brand-200 focus:outline-none focus:ring-2 focus:ring-brand-500 bg-[var(--bg-main)] text-[var(--text-primary)]"
@@ -193,6 +200,7 @@ export function TransactionForm({ onSuccess }: TransactionFormProps) {
                 <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">Descripción (Opcional)</label>
                 <input
                     type="text"
+                    aria-label="Descripción (Opcional)"
                     value={description}
                     onChange={e => setDescription(e.target.value)}
                     className="w-full px-4 py-3 rounded-xl border border-brand-200 focus:outline-none focus:ring-2 focus:ring-brand-500 bg-[var(--bg-main)] text-[var(--text-primary)]"

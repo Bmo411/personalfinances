@@ -1,4 +1,20 @@
-version: '3.8'
+x-backend: &backend
+  build:
+    context: ./backend
+  restart: unless-stopped
+  environment: &environment
+    DB_NAME: ${DB_NAME}
+    DB_USER: ${DB_USER}
+    DB_PASSWORD: ${DB_PASSWORD}
+    DB_HOST: ${DB_HOST}
+    DB_PORT: ${DB_PORT:-5432}
+    DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?Configure DJANGO_SECRET_KEY in Coolify}
+    DEBUG: "False"
+    ALLOWED_HOSTS: ${ALLOWED_HOSTS:-finance.blueberrieslab.com,backend,localhost,127.0.0.1}
+    CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-https://finance.blueberrieslab.com}
+    PUBLIC_URL: https://finance.blueberrieslab.com
+  networks:
+    - coolify
 
 networks:
   coolify:
@@ -6,25 +22,16 @@ networks:
 
 services:
   backend:
-    build: 
-      context: ./backend
-    container_name: finance_backend
-    restart: unless-stopped
-    command: sh -c "python manage.py collectstatic --noinput && python manage.py migrate && gunicorn --bind 0.0.0.0:8000 config.wsgi:application"
-    environment:
-      - DB_NAME=${DB_NAME}
-      - DB_USER=${DB_USER}
-      - DB_PASSWORD=${DB_PASSWORD}
-      - DB_HOST=${DB_HOST}
-      - DB_PORT=${DB_PORT}
-      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
-      - DEBUG=False
-      - ALLOWED_HOSTS=${ALLOWED_HOSTS}
-      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS}
+    <<: *backend
+    command: sh -c "python manage.py collectstatic --noinput && python manage.py migrate --noinput && gunicorn --bind 0.0.0.0:8000 config.wsgi:application"
     expose:
       - '8000'
-    networks:
-      - coolify
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health/', timeout=5)"]
+      interval: 30s
+      timeout: 8s
+      retries: 3
+      start_period: 60s
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.finance-api.rule=Host(`finance.blueberrieslab.com`) && (PathPrefix(`/api`) || PathPrefix(`/admin`) || PathPrefix(`/static`))"
@@ -34,37 +41,58 @@ services:
   frontend:
     build:
       context: ./frontend
-    container_name: finance_frontend
+      args:
+        VITE_API_URL: /api/
     restart: unless-stopped
     expose:
       - '80'
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     networks:
       - coolify
-
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.finance.rule=Host(`finance.blueberrieslab.com`)"
       - "traefik.http.routers.finance.entrypoints=http,https"
       - "traefik.http.services.finance.loadbalancer.server.port=80"
 
-  scheduler:
-    build:
-      context: ./backend
-    container_name: finance_scheduler
-    restart: unless-stopped
-    # Runs notification checks hourly for class/task reminders and daily summaries.
-    command: sh -c "while true; do python manage.py send_whatsapp_notifications; sleep 3600; done"
+  mcp:
+    <<: *backend
+    command: python -m uvicorn mcp_server:app --host 0.0.0.0 --port 8002 --no-access-log
     environment:
-      - DB_NAME=${DB_NAME}
-      - DB_USER=${DB_USER}
-      - DB_PASSWORD=${DB_PASSWORD}
-      - DB_HOST=${DB_HOST}
-      - DB_PORT=${DB_PORT}
-      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
-      - DEBUG=False
-      - ALLOWED_HOSTS=${ALLOWED_HOSTS}
-      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS}
-    networks:
-      - coolify
+      <<: *environment
+      INTERNAL_API_URL: http://backend:8000/api/integrations/
+    expose:
+      - '8002'
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8002/health', timeout=5)"]
+      interval: 30s
+      timeout: 8s
+      retries: 3
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.finance-mcp.rule=Host(`finance.blueberrieslab.com`) && PathPrefix(`/mcp`)"
+      - "traefik.http.routers.finance-mcp.entrypoints=http,https"
+      - "traefik.http.services.finance-mcp.loadbalancer.server.port=8002"
+
+  scheduler:
+    <<: *backend
+    command: python manage.py run_scheduler
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import time; from pathlib import Path; assert time.time() - Path('/tmp/life-scheduler-heartbeat').stat().st_mtime < 240"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 180s

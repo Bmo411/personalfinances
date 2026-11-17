@@ -1,3 +1,4 @@
+from django.utils import timezone
 import calendar
 import datetime
 from decimal import Decimal, InvalidOperation
@@ -167,7 +168,7 @@ class TransactionViewSet(viewsets.ModelViewSet):
             })
             
         # Calculate upcoming fixed expenses for the current month
-        today = datetime.date.today()
+        today = timezone.localdate()
         recurring_expenses = RecurringExpense.objects.filter(user=self.request.user, is_active=True)
         upcoming_fixed_expenses = 0
         for expense in recurring_expenses:
@@ -282,7 +283,7 @@ class TransactionViewSet(viewsets.ModelViewSet):
         })
 
     def _get_summary_period_bounds(self, request):
-        today = datetime.date.today()
+        today = timezone.localdate()
         month = request.query_params.get('month')
         year = request.query_params.get('year')
         date_from = parse_date(request.query_params.get('date_from', '') or '')
@@ -385,7 +386,7 @@ class TransactionViewSet(viewsets.ModelViewSet):
         }
 
     def _average_monthly_expense(self, user):
-        today = datetime.date.today()
+        today = timezone.localdate()
         start = today - datetime.timedelta(days=89)
         total = Transaction.objects.filter(
             user=user,
@@ -678,7 +679,7 @@ class TransactionViewSet(viewsets.ModelViewSet):
         from_account_id = request.data.get('from_account')
         to_account_id = request.data.get('to_account')
         amount = request.data.get('amount')
-        date = request.data.get('date', datetime.date.today())
+        date = request.data.get('date', timezone.localdate())
         description = request.data.get('description', '')
 
         if not from_account_id or not to_account_id or not amount:
@@ -772,7 +773,7 @@ class SavingsGoalViewSet(viewsets.ModelViewSet):
             type='OUT',
             account_id=account_id if account_id else None,
             amount=amount,
-            date=request.data.get('date') or datetime.date.today(),
+            date=request.data.get('date') or timezone.localdate(),
             description=f'Depósito a meta de ahorro: {goal.name}',
             payment_method='TRANSFER',
             is_transfer=True # Considered a transfer conceptually, protects from gross expense calculations
@@ -811,7 +812,7 @@ class SavingsGoalViewSet(viewsets.ModelViewSet):
             type='IN',
             account_id=account_id if account_id else None,
             amount=amount,
-            date=request.data.get('date') or datetime.date.today(),
+            date=request.data.get('date') or timezone.localdate(),
             description=f'Retiro de meta de ahorro: {goal.name}',
             payment_method='TRANSFER',
             is_transfer=True # Considered a transfer conceptually, protects from gross income calculations
@@ -870,7 +871,7 @@ class DebtViewSet(viewsets.ModelViewSet):
             account=account,
             type=tx_type,
             amount=amount,
-            date=datetime.date.today(),
+            date=timezone.localdate(),
             description=desc,
             payment_method='TRANSFER', # Defaulting to TRANSFER, or we could pass it from frontend
             category=None,
@@ -931,7 +932,7 @@ class AccountViewSet(viewsets.ModelViewSet):
         if amount > bucket['pending']:
             return Response({'error': 'Amount exceeds pending statement balance'}, status=400)
 
-        payment_date = parse_date(request.data.get('date', '') or '') or datetime.date.today()
+        payment_date = parse_date(request.data.get('date', '') or '') or timezone.localdate()
         with db_transaction.atomic():
             self._create_credit_card_payment(
                 source=source,
@@ -963,7 +964,7 @@ class AccountViewSet(viewsets.ModelViewSet):
         if amount > debt:
             return Response({'error': 'Amount exceeds current credit card debt'}, status=400)
 
-        payment_date = parse_date(request.data.get('date', '') or '') or datetime.date.today()
+        payment_date = parse_date(request.data.get('date', '') or '') or timezone.localdate()
         with db_transaction.atomic():
             Transaction.objects.create(
                 user=request.user,
@@ -1148,7 +1149,7 @@ class AccountViewSet(viewsets.ModelViewSet):
             account=account,
             type=tx_type,
             amount=abs_diff,
-            date=datetime.date.today(),
+            date=timezone.localdate(),
             description=description,
             payment_method='TRANSFER', # Using TRANSFER as it's an internal adjustment
             is_transfer=False
@@ -1184,14 +1185,14 @@ class RecurringExpenseViewSet(viewsets.ModelViewSet):
             account_id=account_id,
             category_id=expense.category.id if expense.category else None,
             amount=expense.amount,
-            date=request.data.get('date') or datetime.date.today(),
+            date=request.data.get('date') or timezone.localdate(),
             description=f'Pago automatizado: {expense.name}',
             payment_method='TRANSFER', # Default assume electronic
             spending_kind='NECESSARY',
         )
         
         # Update the expense
-        expense.last_paid_date = request.data.get('date') or datetime.date.today()
+        expense.last_paid_date = request.data.get('date') or timezone.localdate()
         expense.save()
         
         return Response(RecurringExpenseSerializer(expense).data)
@@ -1217,12 +1218,12 @@ class RecurringIncomeViewSet(viewsets.ModelViewSet):
             account_id=account_id,
             category_id=income.category.id if income.category else None,
             amount=income.amount,
-            date=request.data.get('date') or datetime.date.today(),
+            date=request.data.get('date') or timezone.localdate(),
             description=f'Ingreso fijo: {income.name}',
             payment_method='TRANSFER',
         )
 
-        income.last_received_date = request.data.get('date') or datetime.date.today()
+        income.last_received_date = request.data.get('date') or timezone.localdate()
         income.save()
 
         return Response(RecurringIncomeSerializer(income).data)

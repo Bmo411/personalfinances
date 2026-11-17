@@ -12,9 +12,9 @@ interface AccountSelectorProps {
 function formatAccountBalance(account: { type: string; calculated_balance: number }) {
     const balance = Number(account.calculated_balance);
     if (account.type === 'CREDIT') {
-        return `Deuda $${Math.max(0, -balance).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+        return `Deuda $${Math.max(0, -balance).toLocaleString('es-MX', { minimumFractionDigits: 2 })}`;
     }
-    return `$${balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+    return `$${balance.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`;
 }
 
 export function AccountSelector({ value, onChange, label = 'Cuenta / Origen' }: AccountSelectorProps) {
@@ -84,12 +84,12 @@ export function AccountSelector({ value, onChange, label = 'Cuenta / Origen' }: 
             </label>
 
             <div
-                onClick={() => setIsOpen(true)}
                 className="w-full px-4 py-3 rounded-xl border border-brand-200 bg-[var(--bg-main)] text-[var(--text-primary)] cursor-text flex items-center justify-between"
             >
                 {isOpen ? (
                     <input
                         autoFocus
+                        aria-label="Buscar Cuenta / Origen"
                         type="text"
                         value={search}
                         onChange={e => setSearch(e.target.value)}
@@ -97,9 +97,9 @@ export function AccountSelector({ value, onChange, label = 'Cuenta / Origen' }: 
                         placeholder="Buscar o crear cuenta..."
                     />
                 ) : (
-                    <span className={selectedAcc ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}>
+                    <button type="button" aria-label="Seleccionar Cuenta / Origen" aria-expanded={false} onClick={() => setIsOpen(true)} className="w-full text-left"><span className={selectedAcc ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}>
                         {selectedAcc ? `${selectedAcc.name} (${formatAccountBalance(selectedAcc)})` : 'Seleccionar cuenta...'}
-                    </span>
+                    </span></button>
                 )}
             </div>
 

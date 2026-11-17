@@ -16,6 +16,14 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from django.http import JsonResponse
+from django.db import connection
+
+
+def health(request):
+    with connection.cursor() as cursor:
+        cursor.execute('SELECT 1')
+    return JsonResponse({'status': 'ok'})
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from users.views import RegisterView, UserProfileView, WhatsAppTestView
 from rest_framework.routers import DefaultRouter
@@ -33,6 +41,8 @@ router.register(r'financial-profile', FinancialProfileViewSet, basename='financi
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('api/health/', health),
+    path('api/integrations/', include('integrations.urls')),
     
     # Auth Endpoints
     path('api/auth/register/', RegisterView.as_view(), name='auth_register'),

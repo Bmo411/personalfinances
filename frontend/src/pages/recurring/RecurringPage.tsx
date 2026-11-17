@@ -21,7 +21,7 @@ import { CategorySelector } from '../../components/transactions/CategorySelector
 
 type ActiveTab = 'expenses' | 'incomes';
 
-const moneyFormatter = new Intl.NumberFormat('en-US', {
+const moneyFormatter = new Intl.NumberFormat('es-MX', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
 });

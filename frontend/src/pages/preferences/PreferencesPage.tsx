@@ -1,462 +1,54 @@
 import { useState } from 'react';
-import { useThemeStore } from '../../store/themeStore';
-import { Palette, Moon, Sun, MonitorSmartphone, MessageCircle, KeyRound, Phone, HelpCircle, Send, CheckCircle2, XCircle, Loader2, X, Target, PiggyBank, Clock, UserRound } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { financeService } from '../../services/finance';
+import { Moon, Sun, Send, Plug, Check } from 'lucide-react';
+import { useThemeStore } from '../../store/themeStore';
+import { financeService, type UserProfile, type FinancialProfile } from '../../services/finance';
+import { errorMessage } from '../../services/guide';
 
-// ─── Instructions Modal ────────────────────────────────────────────────────────
-function InstructionsModal({ onClose }: { onClose: () => void }) {
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-            <div className="bg-[var(--bg-secondary)] rounded-2xl shadow-2xl border border-brand-200 w-full max-w-lg">
-                <div className="flex items-center justify-between p-6 border-b border-brand-100">
-                    <h2 className="text-xl font-semibold text-[var(--text-primary)] flex items-center gap-2">
-                        <MessageCircle size={22} className="text-green-500" />
-                        Cómo obtener tu API Key de CallMeBot
-                    </h2>
-                    <button onClick={onClose} className="p-2 rounded-lg hover:bg-[var(--bg-hover)] transition-colors">
-                        <X size={20} className="text-[var(--text-secondary)]" />
-                    </button>
-                </div>
-                <div className="p-6 space-y-4 text-[var(--text-secondary)]">
-                    <ol className="space-y-4 list-none">
-                        <li className="flex gap-3">
-                            <span className="flex-shrink-0 w-7 h-7 rounded-full bg-green-500 text-white text-sm font-bold flex items-center justify-center">1</span>
-                            <div>
-                                <p className="font-medium text-[var(--text-primary)]">Agrega el número de CallMeBot</p>
-                                <p className="text-sm mt-1">Guarda este contacto en tu teléfono:</p>
-                                <code className="mt-1 block text-sm bg-[var(--bg-main)] border border-brand-200 px-3 py-2 rounded-lg font-mono text-brand-700">
-                                    +34 644 66 32 62
-                                </code>
-                            </div>
-                        </li>
-                        <li className="flex gap-3">
-                            <span className="flex-shrink-0 w-7 h-7 rounded-full bg-green-500 text-white text-sm font-bold flex items-center justify-center">2</span>
-                            <div>
-                                <p className="font-medium text-[var(--text-primary)]">Envía este mensaje por WhatsApp</p>
-                                <code className="mt-1 block text-sm bg-[var(--bg-main)] border border-brand-200 px-3 py-2 rounded-lg font-mono text-brand-700">
-                                    I allow callmebot to send me messages
-                                </code>
-                            </div>
-                        </li>
-                        <li className="flex gap-3">
-                            <span className="flex-shrink-0 w-7 h-7 rounded-full bg-green-500 text-white text-sm font-bold flex items-center justify-center">3</span>
-                            <div>
-                                <p className="font-medium text-[var(--text-primary)]">Recibirás tu API Key</p>
-                                <p className="text-sm mt-1">CallMeBot te responderá con un mensaje que contiene tu clave personal. Cópiala y pégala en el campo de arriba.</p>
-                            </div>
-                        </li>
-                        <li className="flex gap-3">
-                            <span className="flex-shrink-0 w-7 h-7 rounded-full bg-green-500 text-white text-sm font-bold flex items-center justify-center">4</span>
-                            <div>
-                                <p className="font-medium text-[var(--text-primary)]">Ingresa tu número en formato internacional</p>
-                                <p className="text-sm mt-1">Incluye el código del país sin el símbolo <code className="bg-[var(--bg-main)] px-1 rounded">+</code>. Ejemplo para México:</p>
-                                <code className="mt-1 block text-sm bg-[var(--bg-main)] border border-brand-200 px-3 py-2 rounded-lg font-mono text-brand-700">
-                                    5212345678901
-                                </code>
-                            </div>
-                        </li>
-                    </ol>
-                </div>
-                <div className="p-6 border-t border-brand-100">
-                    <button
-                        onClick={onClose}
-                        className="w-full bg-brand-700 hover:bg-brand-900 text-white font-medium py-3 rounded-xl transition-colors"
-                    >
-                        Entendido
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
+export function PreferencesPage() {
+    const profile = useQuery({ queryKey: ['userProfile'], queryFn: financeService.getUserProfile });
+    const finance = useQuery({ queryKey: ['financialProfile'], queryFn: financeService.getFinancialProfile });
+    if (profile.isPending || finance.isPending) return <p className="empty-state">Cargando preferencias…</p>;
+    if (!profile.data || !finance.data) return <p className="form-error">No se pudieron cargar las preferencias.</p>;
+    return <PreferencesForm profile={profile.data} financial={finance.data} />;
 }
 
-// ─── Main Page ─────────────────────────────────────────────────────────────────
-export function PreferencesPage() {
+function PreferencesForm({ profile, financial }: { profile: UserProfile; financial: FinancialProfile }) {
     const { theme, setTheme } = useThemeStore();
-    const queryClient = useQueryClient();
-    const [showInstructions, setShowInstructions] = useState(false);
-    const [testStatus, setTestStatus] = useState<'idle' | 'sending' | 'ok' | 'error'>('idle');
+    const client = useQueryClient();
+    const [phone, setPhone] = useState(profile.whatsapp_phone || '');
+    const [key, setKey] = useState('');
+    const [enabled, setEnabled] = useState(profile.whatsapp_enabled);
+    const [meditation, setMeditation] = useState(profile.meditation_reminder_enabled);
+    const [time, setTime] = useState(profile.meditation_reminder_time.slice(0, 5));
     const [testMessage, setTestMessage] = useState('');
-
-    // ── Remote state
-    const { data: profile, isLoading: profileLoading } = useQuery({
-        queryKey: ['userProfile'],
-        queryFn: financeService.getUserProfile,
-    });
-
-    const [localPhone, setLocalPhone] = useState<string>('');
-    const [localApiKey, setLocalApiKey] = useState<string>('');
-    const [localEnabled, setLocalEnabled] = useState<boolean>(false);
-    const [synced, setSynced] = useState(false);
-    const [financialSynced, setFinancialSynced] = useState(false);
-    const [localEmergencyGoal, setLocalEmergencyGoal] = useState('30000.00');
-    const [localOutingBudget, setLocalOutingBudget] = useState('0.00');
-    const [localAge, setLocalAge] = useState('');
-    const [localWeeklyHours, setLocalWeeklyHours] = useState('');
-    const [localCurrentGoal, setLocalCurrentGoal] = useState('Eliminar deudas');
-
-    const { data: financialProfile } = useQuery({
-        queryKey: ['financialProfile'],
-        queryFn: financeService.getFinancialProfile,
-    });
-
-    // Sync once profile loads
-    if (profile && !synced) {
-        setLocalPhone(profile.whatsapp_phone || '');
-        setLocalApiKey(profile.whatsapp_apikey || '');
-        setLocalEnabled(profile.whatsapp_enabled);
-        setSynced(true);
-    }
-
-    if (financialProfile && !financialSynced) {
-        setLocalEmergencyGoal(financialProfile.emergency_fund_goal || '30000.00');
-        setLocalOutingBudget(financialProfile.monthly_outing_budget || '0.00');
-        setLocalAge(financialProfile.age ? String(financialProfile.age) : '');
-        setLocalWeeklyHours(financialProfile.weekly_work_hours ? String(financialProfile.weekly_work_hours) : '');
-        setLocalCurrentGoal(financialProfile.current_goal || 'Eliminar deudas');
-        setFinancialSynced(true);
-    }
-
-    const saveMutation = useMutation({
-        mutationFn: (data: Parameters<typeof financeService.updateUserProfile>[0]) =>
-            financeService.updateUserProfile(data),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['userProfile'] });
-        }
-    });
-
-    const handleSave = () => {
-        saveMutation.mutate({
-            whatsapp_phone: localPhone || null,
-            whatsapp_apikey: localApiKey || null,
-            whatsapp_enabled: localEnabled,
-        });
-    };
-
-    const financialSaveMutation = useMutation({
-        mutationFn: financeService.updateFinancialProfile,
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['financialProfile'] });
-            queryClient.invalidateQueries({ queryKey: ['summary'] });
-        }
-    });
-
-    const handleFinancialSave = () => {
-        financialSaveMutation.mutate({
-            emergency_fund_goal: localEmergencyGoal || '0.00',
-            monthly_outing_budget: localOutingBudget || '0.00',
-            age: localAge ? Number(localAge) : null,
-            weekly_work_hours: localWeeklyHours ? Number(localWeeklyHours) : null,
-            current_goal: localCurrentGoal || 'Eliminar deudas',
-        });
-    };
-
-    const handleTest = async () => {
-        // Save settings first
-        try {
-            await financeService.updateUserProfile({
-                whatsapp_phone: localPhone || null,
-                whatsapp_apikey: localApiKey || null,
-                whatsapp_enabled: localEnabled,
-            });
-        } catch {
-            // Best-effort save before test
-        }
-
-        setTestStatus('sending');
-        setTestMessage('');
-
-        // Llamar a CallMeBot directo desde el navegador
-        try {
-            const phone = localPhone.trim().replace(/\+/g, '');
-            const message = encodeURIComponent('Conexion exitosa con tu app de finanzas. Las notificaciones de gastos fijos y tarjetas estan activas.');
-            await fetch(
-                `https://api.callmebot.com/whatsapp.php?phone=${phone}&text=${message}&apikey=${localApiKey.trim()}`,
-                { mode: 'no-cors' }
-            );
-            // Con no-cors no podemos leer la respuesta, pero si llegó aquí el request se envió
-            setTestStatus('ok');
-            setTestMessage('Solicitud enviada. Deberias recibir el WhatsApp en unos segundos.');
-        } catch {
-            setTestStatus('error');
-            setTestMessage('No se pudo enviar. Verifica tu conexión a internet.');
-        }
-    };
-
-    const canTest = localPhone.trim().length > 5 && localApiKey.trim().length > 3;
-    const isDirty = profile && (
-        localPhone !== (profile.whatsapp_phone || '') ||
-        localApiKey !== (profile.whatsapp_apikey || '') ||
-        localEnabled !== profile.whatsapp_enabled
-    );
-    const isFinancialDirty = financialProfile && (
-        localEmergencyGoal !== (financialProfile.emergency_fund_goal || '30000.00') ||
-        localOutingBudget !== (financialProfile.monthly_outing_budget || '0.00') ||
-        localAge !== (financialProfile.age ? String(financialProfile.age) : '') ||
-        localWeeklyHours !== (financialProfile.weekly_work_hours ? String(financialProfile.weekly_work_hours) : '') ||
-        localCurrentGoal !== (financialProfile.current_goal || 'Eliminar deudas')
-    );
-
-    return (
-        <div className="space-y-6 max-w-4xl mx-auto">
-            <h1 className="text-2xl font-bold">Preferencias</h1>
-
-            {/* Tema de Interfaz */}
-            <div className="bg-[var(--bg-secondary)] rounded-2xl p-6 shadow-sm border border-brand-200">
-                <div className="flex items-center gap-3 mb-6">
-                    <Palette className="text-brand-700" size={24} />
-                    <h2 className="text-xl font-semibold text-[var(--text-primary)]">Tema y Pantalla</h2>
-                </div>
-
-                <div className="space-y-4">
-                    <p className="text-sm text-[var(--text-secondary)] mb-4">
-                        Personaliza los colores de la aplicación.
-                    </p>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {/* Verde Pastel Default */}
-                        <button
-                            onClick={() => setTheme('light')}
-                            className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-2 text-[var(--text-primary)] ${theme === 'light' ? 'border-brand-500 bg-brand-50 shadow-md' : 'border-brand-200 hover:border-brand-400 bg-[var(--bg-main)]'
-                                }`}
-                        >
-                            <div className="w-12 h-12 rounded-full overflow-hidden flex border border-gray-200 shadow-sm">
-                                <div className="w-1/2 h-full bg-[#E9F5DB]"></div>
-                                <div className="w-1/2 h-full bg-[#718355]"></div>
-                            </div>
-                            <span className="font-medium">Original (Verde)</span>
-                            <div className="flex bg-[var(--bg-secondary)] border border-brand-200 rounded-full px-2 py-1 text-xs gap-1 mt-1 text-[var(--text-secondary)]">
-                                <Sun size={14} className="text-yellow-600" /> Claro
-                            </div>
-                        </button>
-
-                        {/* Océano */}
-                        <button
-                            onClick={() => setTheme('ocean')}
-                            className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-2 text-[var(--text-primary)] ${theme === 'ocean' ? 'border-[#38bdf8] bg-brand-50 shadow-md' : 'border-brand-200 hover:border-[#7dd3fc] bg-[var(--bg-main)]'
-                                }`}
-                        >
-                            <div className="w-12 h-12 rounded-full overflow-hidden flex border border-gray-200 shadow-sm">
-                                <div className="w-1/2 h-full bg-[#e0f2fe]"></div>
-                                <div className="w-1/2 h-full bg-[#0c4a6e]"></div>
-                            </div>
-                            <span className="font-medium">Océano</span>
-                            <div className="flex bg-[var(--bg-secondary)] border border-brand-200 rounded-full px-2 py-1 text-xs gap-1 mt-1 text-[var(--text-secondary)]">
-                                <Sun size={14} className="text-yellow-600" /> Claro
-                            </div>
-                        </button>
-
-                        {/* Oscuro */}
-                        <button
-                            onClick={() => setTheme('dark')}
-                            className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-2 ${theme === 'dark' ? 'border-[#71a367] bg-[#1a2318] shadow-md text-white' : 'border-brand-200 hover:border-[#598051] bg-[var(--bg-main)] text-[var(--text-primary)]'
-                                }`}
-                        >
-                            <div className="w-12 h-12 rounded-full overflow-hidden flex border border-gray-200 shadow-sm">
-                                <div className="w-1/2 h-full bg-[#121212]"></div>
-                                <div className="w-1/2 h-full bg-[#71a367]"></div>
-                            </div>
-                            <span className="font-medium">Oscuro</span>
-                            <div className="flex bg-[var(--bg-secondary)] border border-brand-200 rounded-full px-2 py-1 text-xs gap-1 mt-1 text-[var(--text-secondary)]">
-                                <Moon size={14} className="text-blue-400" /> Oscuro
-                            </div>
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            {/* Financial Goals */}
-            <div className="bg-[var(--bg-secondary)] rounded-2xl p-6 shadow-sm border border-brand-200">
-                <div className="flex items-center gap-3 mb-6">
-                    <Target className="text-brand-700" size={24} />
-                    <h2 className="text-xl font-semibold text-[var(--text-primary)]">Metas y presupuestos</h2>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <label className="space-y-2">
-                        <span className="text-sm font-medium text-[var(--text-secondary)] flex items-center gap-2">
-                            <PiggyBank size={16} /> Meta fondo de emergencia
-                        </span>
-                        <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={localEmergencyGoal}
-                            onChange={(event) => setLocalEmergencyGoal(event.target.value)}
-                            className="w-full px-4 py-3 rounded-xl border border-brand-200 bg-[var(--bg-main)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-brand-500"
-                        />
-                    </label>
-
-                    <label className="space-y-2">
-                        <span className="text-sm font-medium text-[var(--text-secondary)] flex items-center gap-2">
-                            <Target size={16} /> Presupuesto mensual para salidas
-                        </span>
-                        <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={localOutingBudget}
-                            onChange={(event) => setLocalOutingBudget(event.target.value)}
-                            className="w-full px-4 py-3 rounded-xl border border-brand-200 bg-[var(--bg-main)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-brand-500"
-                        />
-                    </label>
-
-                    <label className="space-y-2">
-                        <span className="text-sm font-medium text-[var(--text-secondary)] flex items-center gap-2">
-                            <UserRound size={16} /> Edad
-                        </span>
-                        <input
-                            type="number"
-                            min="0"
-                            value={localAge}
-                            onChange={(event) => setLocalAge(event.target.value)}
-                            className="w-full px-4 py-3 rounded-xl border border-brand-200 bg-[var(--bg-main)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-brand-500"
-                        />
-                    </label>
-
-                    <label className="space-y-2">
-                        <span className="text-sm font-medium text-[var(--text-secondary)] flex items-center gap-2">
-                            <Clock size={16} /> Horas trabajadas por semana
-                        </span>
-                        <input
-                            type="number"
-                            min="0"
-                            value={localWeeklyHours}
-                            onChange={(event) => setLocalWeeklyHours(event.target.value)}
-                            className="w-full px-4 py-3 rounded-xl border border-brand-200 bg-[var(--bg-main)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-brand-500"
-                        />
-                    </label>
-
-                    <label className="space-y-2 md:col-span-2">
-                        <span className="text-sm font-medium text-[var(--text-secondary)]">Meta actual</span>
-                        <input
-                            type="text"
-                            value={localCurrentGoal}
-                            onChange={(event) => setLocalCurrentGoal(event.target.value)}
-                            className="w-full px-4 py-3 rounded-xl border border-brand-200 bg-[var(--bg-main)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-brand-500"
-                            placeholder="Eliminar deudas"
-                        />
-                    </label>
-                </div>
-
-                <div className="flex justify-end mt-5">
-                    <button
-                        onClick={handleFinancialSave}
-                        disabled={!isFinancialDirty || financialSaveMutation.isPending}
-                        className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-brand-700 hover:bg-brand-900 text-white text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                        {financialSaveMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : 'Guardar metas'}
-                    </button>
-                </div>
-            </div>
-
-            {/* WhatsApp Notifications */}
-            <div className="bg-[var(--bg-secondary)] rounded-2xl p-6 shadow-sm border border-brand-200">
-                <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-3">
-                        <MessageCircle className="text-green-500" size={24} />
-                        <h2 className="text-xl font-semibold text-[var(--text-primary)]">Notificaciones WhatsApp</h2>
-                    </div>
-                    {/* Toggle */}
-                    <button
-                        disabled={profileLoading}
-                        onClick={() => setLocalEnabled(!localEnabled)}
-                        className={`relative w-14 h-7 rounded-full transition-colors duration-300 focus:outline-none ${localEnabled ? 'bg-green-500' : 'bg-[var(--bg-main)] border border-brand-200'}`}
-                    >
-                        <span
-                            className={`absolute top-0.5 left-0.5 w-6 h-6 rounded-full bg-white shadow transition-transform duration-300 ${localEnabled ? 'translate-x-7' : 'translate-x-0'}`}
-                        />
-                    </button>
-                </div>
-                <p className="text-sm text-[var(--text-secondary)] mb-6">
-                    Recibe avisos por WhatsApp para gastos fijos, cortes de tarjeta y fechas limite de pago.
-                    Requiere una cuenta de{' '}
-                    <a href="https://www.callmebot.com/blog/free-api-whatsapp-messages/" target="_blank" rel="noreferrer" className="text-green-600 underline font-medium">
-                        CallMeBot
-                    </a>{' '}(gratis).
-                </p>
-
-                <div className={`space-y-4 transition-all duration-300 ${localEnabled ? 'opacity-100' : 'opacity-40 pointer-events-none select-none'}`}>
-                    {/* Phone */}
-                    <div>
-                        <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2 flex items-center gap-1.5">
-                            <Phone size={15} /> Número de teléfono (formato internacional)
-                        </label>
-                        <input
-                            type="text"
-                            value={localPhone}
-                            onChange={e => setLocalPhone(e.target.value)}
-                            placeholder="5212345678901"
-                            className="w-full px-4 py-3 rounded-xl border border-brand-200 bg-[var(--bg-main)] text-[var(--text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-green-300"
-                        />
-                        <p className="text-xs text-[var(--text-secondary)] mt-1">Sin el símbolo +. Ejemplo MX: 5212345678901</p>
-                    </div>
-
-                    {/* API Key */}
-                    <div>
-                        <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2 flex items-center gap-1.5">
-                            <KeyRound size={15} /> API Key de CallMeBot
-                        </label>
-                        <input
-                            type="password"
-                            value={localApiKey}
-                            onChange={e => setLocalApiKey(e.target.value)}
-                            placeholder="Tu API key..."
-                            className="w-full px-4 py-3 rounded-xl border border-brand-200 bg-[var(--bg-main)] text-[var(--text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-green-300"
-                        />
-                    </div>
-
-                    {/* Info + test result */}
-                    {testStatus !== 'idle' && (
-                        <div className={`flex items-start gap-2 px-4 py-3 rounded-xl text-sm border ${testStatus === 'ok' ? 'bg-green-50 border-green-200 text-green-700' : testStatus === 'error' ? 'bg-red-50 border-red-200 text-red-700' : 'bg-[var(--bg-main)] border-brand-200 text-[var(--text-secondary)]'}`}>
-                            {testStatus === 'sending' && <Loader2 size={16} className="animate-spin mt-0.5 shrink-0" />}
-                            {testStatus === 'ok' && <CheckCircle2 size={16} className="mt-0.5 shrink-0" />}
-                            {testStatus === 'error' && <XCircle size={16} className="mt-0.5 shrink-0" />}
-                            <span>{testStatus === 'sending' ? 'Enviando mensaje de prueba...' : testMessage}</span>
-                        </div>
-                    )}
-
-                    {/* Action buttons */}
-                    <div className="flex flex-col sm:flex-row gap-3 pt-1">
-                        <button
-                            onClick={() => setShowInstructions(true)}
-                            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-brand-200 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] text-sm font-medium transition-colors"
-                        >
-                            <HelpCircle size={16} />
-                            ¿Cómo conseguir el API Key?
-                        </button>
-
-                        <button
-                            onClick={handleTest}
-                            disabled={!canTest || testStatus === 'sending'}
-                            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-green-200 bg-green-50 hover:bg-green-100 text-green-700 text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                        >
-                            {testStatus === 'sending' ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-                            Enviar mensaje de prueba
-                        </button>
-
-                        <button
-                            onClick={handleSave}
-                            disabled={!isDirty || saveMutation.isPending}
-                            className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-brand-700 hover:bg-brand-900 text-white text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed ml-auto"
-                        >
-                            {saveMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : 'Guardar'}
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            {/* Sistema (Placeholder) */}
-            <div className="bg-[var(--bg-secondary)] rounded-2xl p-6 shadow-sm border border-brand-200 opacity-60">
-                <div className="flex items-center gap-3 mb-6">
-                    <MonitorSmartphone className="text-brand-700" size={24} />
-                    <h2 className="text-xl font-semibold text-[var(--text-primary)]">Sistema y Visualización</h2>
-                </div>
-                <p className="text-sm italic text-[var(--text-secondary)]">Próximamente: Reglas de redondeo, moneda por defecto e idioma.</p>
-            </div>
-
-            {showInstructions && <InstructionsModal onClose={() => setShowInstructions(false)} />}
-        </div>
-    );
+    const payload = () => ({ whatsapp_phone: phone || null, ...(key ? { whatsapp_apikey: key } : {}), whatsapp_enabled: enabled, meditation_reminder_enabled: meditation, meditation_reminder_time: time + ':00' });
+    const save = useMutation({ mutationFn: () => financeService.updateUserProfile(payload()), onSuccess: () => { setKey(''); client.invalidateQueries({ queryKey: ['userProfile'] }); } });
+    const test = useMutation({ mutationFn: async () => {
+        await financeService.updateUserProfile(payload());
+        return financeService.sendWhatsAppTest(phone, key);
+    }, onSuccess: result => { setTestMessage(result.message || 'CallMeBot aceptó la solicitud.'); setKey(''); client.invalidateQueries({ queryKey: ['userProfile'] }); }, onError: () => client.invalidateQueries({ queryKey: ['userProfile'] }) });
+    const saveFinance = useMutation({ mutationFn: financeService.updateFinancialProfile, onSuccess: () => client.invalidateQueries() });
+    const fields: { key: keyof FinancialProfile; label: string; min?: number }[] = [
+        { key: 'emergency_fund_goal', label: 'Meta del fondo de emergencia · MXN' },
+        { key: 'monthly_outing_budget', label: 'Presupuesto mensual de salidas · MXN' },
+        { key: 'age', label: 'Edad' }, { key: 'weekly_work_hours', label: 'Horas de trabajo por semana' },
+    ];
+    return <div className="guide-page"><header className="page-heading"><div><p className="eyebrow">Tu guía, a tu ritmo</p><h1>Preferencias</h1></div><Link to="/integrations" className="subtle-link"><Plug size={16} />Integraciones</Link></header>
+        <section className="surface"><h2 className="mb-5">Apariencia</h2><div className="flex gap-3"><button className={theme === 'dark' ? 'primary-button' : 'secondary-button'} onClick={() => setTheme('dark')}><Moon size={17} />Oscuro</button><button className={theme === 'light' ? 'primary-button' : 'secondary-button'} onClick={() => setTheme('light')}><Sun size={17} />Claro</button></div></section>
+        <section className="surface space-y-5"><div className="section-heading"><h2>Recordatorios por WhatsApp</h2><span className="small-tag">{profile.whatsapp_status === 'CONFIG_REQUIRED' ? 'Requiere configuración' : profile.whatsapp_status === 'ACCEPTED' ? 'Envío aceptado' : profile.whatsapp_status === 'UNVERIFIED' ? 'Sin verificar' : 'Revisar conexión'}</span></div><p className="text-muted">Avisos de pendientes, clases, gastos fijos y tarjetas. El recordatorio de meditación incluye la frase del día y una pregunta para reflexionar.</p>
+            <label className="check-label"><input type="checkbox" checked={enabled} onChange={e => setEnabled(e.target.checked)} />Activar avisos por WhatsApp</label>
+            <div className="grid sm:grid-cols-2 gap-4"><label className="field">Número con código de país<input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="+52…" /></label><label className="field">Clave de CallMeBot<input type="password" autoComplete="new-password" value={key} onChange={e => setKey(e.target.value)} placeholder={profile.whatsapp_key_configured ? 'Clave guardada · escribe para reemplazar' : 'Tu clave de CallMeBot'} /></label></div>
+            <div className="flex flex-wrap items-center gap-6"><label className="check-label"><input type="checkbox" checked={meditation} onChange={e => setMeditation(e.target.checked)} />Recordatorio diario de meditación</label><label className="field">Hora · Ciudad de México<input type="time" required value={time} onChange={e => setTime(e.target.value)} /></label></div>
+            <div className="flex flex-wrap gap-3"><button className="primary-button" disabled={save.isPending || !time} onClick={() => save.mutate()}>{save.isPending ? 'Guardando…' : 'Guardar preferencias'}</button><button className="secondary-button" disabled={test.isPending || !phone || (!key && !profile.whatsapp_key_configured) || !time} onClick={() => test.mutate()}><Send size={16} />{test.isPending ? 'Enviando…' : 'Guardar y probar WhatsApp'}</button></div>
+            {save.isSuccess && <p className="text-brand-700 flex gap-2"><Check size={16} />Preferencias guardadas.</p>}{(save.isError || test.isError) && <p className="form-error">{errorMessage(save.error || test.error)}</p>}{testMessage && <p className="text-brand-700">{testMessage}</p>}
+            <a className="text-button" href="https://www.callmebot.com/blog/free-api-whatsapp-messages/" target="_blank" rel="noreferrer">Activación de CallMeBot</a>
+        </section>
+        <section className="surface"><h2 className="mb-5">Metas financieras</h2><form className="space-y-5" onSubmit={event => {
+            event.preventDefault();
+            const form = new FormData(event.currentTarget);
+            saveFinance.mutate({ emergency_fund_goal: String(form.get('emergency_fund_goal') || '0'), monthly_outing_budget: String(form.get('monthly_outing_budget') || '0'), age: form.get('age') ? Number(form.get('age')) : null, weekly_work_hours: form.get('weekly_work_hours') ? Number(form.get('weekly_work_hours')) : null, current_goal: String(form.get('current_goal') || '') });
+        }}><div className="grid sm:grid-cols-2 gap-4">{fields.map(field => <label key={field.key} className="field">{field.label}<input name={field.key} type="number" min="0" step={field.key === 'age' ? '1' : '0.01'} defaultValue={financial[field.key] ?? ''} /></label>)}</div><label className="field">Tu meta actual<input name="current_goal" defaultValue={financial.current_goal} /></label><button className="primary-button" disabled={saveFinance.isPending}>{saveFinance.isPending ? 'Guardando…' : 'Guardar metas'}</button>{saveFinance.isSuccess && <p className="text-brand-700">Metas guardadas.</p>}{saveFinance.isError && <p className="form-error">{errorMessage(saveFinance.error)}</p>}</form></section>
+    </div>;
 }

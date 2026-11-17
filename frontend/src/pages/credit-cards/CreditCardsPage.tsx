@@ -13,7 +13,7 @@ type PaymentTarget =
 type AdjustmentTarget = { card: CreditCardAccount; transaction: CreditCardBucketTransaction };
 
 function money(value: number) {
-    return value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return value.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function formatDate(value: string | null | undefined) {

@@ -1,3 +1,4 @@
+from django.utils import timezone
 import calendar
 import datetime
 from decimal import Decimal
@@ -151,7 +152,7 @@ def build_credit_card_buckets(user, card):
 
 
 def next_pending_credit_bucket(user, card, today=None):
-    today = today or datetime.date.today()
+    today = today or timezone.localdate()
     data = build_credit_card_buckets(user, card)
     pending = [bucket for bucket in data['buckets'] if bucket['pending'] > Decimal('0.00')]
     if not pending:

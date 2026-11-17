@@ -86,6 +86,7 @@ class WorkTask(models.Model):
     )
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='life_tasks')
+    project = models.ForeignKey('Project', on_delete=models.SET_NULL, null=True, blank=True, related_name='tasks')
     title = models.CharField(max_length=180)
     area = models.CharField(max_length=12, choices=AREA_CHOICES, default='WORK')
     priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default='MEDIUM')
@@ -147,6 +148,8 @@ class NotificationLog(models.Model):
     event_key = models.CharField(max_length=180)
     event_date = models.DateField()
     sent_at = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(max_length=20, default='SENT')
+    error = models.CharField(max_length=250, blank=True)
 
     class Meta:
         ordering = ['-sent_at']
@@ -159,3 +162,94 @@ class NotificationLog(models.Model):
 
     def __str__(self):
         return f'{self.channel}: {self.event_key} @ {self.event_date}'
+
+
+class OwnedRecord(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        abstract = True
+        ordering = ['-created_at']
+
+
+class Project(OwnedRecord):
+    name = models.CharField(max_length=150)
+    description = models.TextField(blank=True)
+    status = models.CharField(max_length=12, choices=[('ACTIVE', 'Activo'), ('PAUSED', 'Pausado'), ('DONE', 'Terminado')], default='ACTIVE')
+
+    class Meta(OwnedRecord.Meta):
+        ordering = ['name']
+        constraints = [models.UniqueConstraint(fields=['user', 'name'], name='unique_user_project')]
+
+
+class Note(OwnedRecord):
+    title = models.CharField(max_length=180)
+    body = models.TextField()
+    project = models.ForeignKey(Project, on_delete=models.SET_NULL, null=True, blank=True)
+    pinned = models.BooleanField(default=False)
+
+    class Meta(OwnedRecord.Meta):
+        ordering = ['-pinned', '-updated_at']
+
+
+class Prospect(OwnedRecord):
+    name = models.CharField(max_length=150)
+    company = models.CharField(max_length=150, blank=True)
+    email = models.EmailField(blank=True)
+    project = models.ForeignKey(Project, on_delete=models.SET_NULL, null=True, blank=True)
+    stage = models.CharField(max_length=12, choices=[('NEW', 'Nuevo'), ('CONTACTED', 'Contactado'), ('PROPOSAL', 'Propuesta'), ('WON', 'Ganado'), ('LOST', 'Cerrado')], default='NEW')
+    next_follow_up = models.DateField(null=True, blank=True)
+    notes = models.TextField(blank=True)
+
+
+class Workout(OwnedRecord):
+    date = models.DateField()
+    title = models.CharField(max_length=150)
+    notes = models.TextField(blank=True)
+
+    class Meta(OwnedRecord.Meta):
+        ordering = ['-date', '-created_at']
+
+
+class WorkoutSet(models.Model):
+    workout = models.ForeignKey(Workout, on_delete=models.CASCADE, related_name='sets')
+    exercise = models.CharField(max_length=150)
+    reps = models.PositiveSmallIntegerField(validators=[MinValueValidator(1)])
+    weight_kg = models.DecimalField(max_digits=7, decimal_places=2, validators=[MinValueValidator(0)])
+
+    class Meta:
+        ordering = ['id']
+
+
+class Meal(OwnedRecord):
+    date = models.DateField()
+    name = models.CharField(max_length=150)
+    portion = models.CharField(max_length=180)
+    calories = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True, validators=[MinValueValidator(0)])
+    protein_g = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True, validators=[MinValueValidator(0)])
+    carbs_g = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True, validators=[MinValueValidator(0)])
+    fat_g = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True, validators=[MinValueValidator(0)])
+    notes = models.TextField(blank=True)
+
+    class Meta(OwnedRecord.Meta):
+        ordering = ['-date', '-created_at']
+
+
+class Meditation(OwnedRecord):
+    date = models.DateField()
+    minutes = models.PositiveSmallIntegerField(validators=[MinValueValidator(1), MaxValueValidator(1440)])
+    reflection = models.TextField(blank=True)
+
+    class Meta(OwnedRecord.Meta):
+        ordering = ['-date', '-created_at']
+
+
+class MathSnapshot(OwnedRecord):
+    source = models.CharField(max_length=60, default='matematicas')
+    digest = models.CharField(max_length=64)
+    payload = models.JSONField()
+
+    class Meta(OwnedRecord.Meta):
+        constraints = [models.UniqueConstraint(fields=['user', 'source'], name='unique_user_math_source')]

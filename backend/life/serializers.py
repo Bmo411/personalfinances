@@ -3,6 +3,13 @@ from rest_framework import serializers
 from .models import Lesson, MonthlyFocus, NotificationLog, Student, WorkTask
 
 
+class ProjectOwnershipMixin:
+    def validate_project(self, project):
+        if project and project.user_id != self.context['request'].user.id:
+            raise serializers.ValidationError('El proyecto no pertenece a tu cuenta.')
+        return project
+
+
 class StudentSerializer(serializers.ModelSerializer):
     upcoming_lessons_count = serializers.IntegerField(read_only=True)
 
@@ -28,11 +35,23 @@ class LessonSerializer(serializers.ModelSerializer):
         return student
 
 
-class WorkTaskSerializer(serializers.ModelSerializer):
+class WorkTaskSerializer(ProjectOwnershipMixin, serializers.ModelSerializer):
     class Meta:
         model = WorkTask
         fields = '__all__'
         read_only_fields = ('user', 'completed_at')
+
+    def create(self, validated_data):
+        from django.utils import timezone
+        if validated_data.get('status') == 'DONE':
+            validated_data['completed_at'] = timezone.now()
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        from django.utils import timezone
+        if 'status' in validated_data and validated_data['status'] != instance.status:
+            validated_data['completed_at'] = timezone.now() if validated_data['status'] == 'DONE' else None
+        return super().update(instance, validated_data)
 
 
 class MonthlyFocusSerializer(serializers.ModelSerializer):

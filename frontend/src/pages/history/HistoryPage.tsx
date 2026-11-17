@@ -156,7 +156,7 @@ export function HistoryPage() {
                                 </div>
                                 <div className="col-span-2 text-left md:text-right mt-1 md:mt-0 font-bold flex items-center justify-between md:justify-end gap-4">
                                     <span className={tx.type === 'IN' ? 'text-brand-600' : 'text-red-500'}>
-                                        {tx.type === 'IN' ? '+' : '-'}${Number(tx.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                        {tx.type === 'IN' ? '+' : '-'}${Number(tx.amount).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
                                     </span>
                                     <button
                                         onClick={() => handleDelete(tx.id)}

@@ -32,7 +32,7 @@ import { TransactionForm } from '../../components/transactions/TransactionForm';
 
 type PeriodMode = 'all' | 'month' | 'range';
 
-const currencyFormatter = new Intl.NumberFormat('en-US', {
+const currencyFormatter = new Intl.NumberFormat('es-MX', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
 });
