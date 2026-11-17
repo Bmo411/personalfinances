@@ -26,6 +26,7 @@ def health(request):
     return JsonResponse({'status': 'ok'})
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from users.views import RegisterView, UserProfileView, WhatsAppTestView
+from users.telegram_views import TelegramConnectView, TelegramConfirmView, TelegramDisconnectView, TelegramTestView
 from rest_framework.routers import DefaultRouter
 from finance.views import CategoryViewSet, TransactionViewSet, SavingsGoalViewSet, DebtViewSet, AccountViewSet, RecurringExpenseViewSet, RecurringIncomeViewSet, FinancialProfileViewSet
 
@@ -52,6 +53,10 @@ urlpatterns = [
     # User Endpoints
     path('api/users/profile/', UserProfileView.as_view(), name='user_profile'),
     path('api/users/whatsapp-test/', WhatsAppTestView.as_view(), name='whatsapp_test'),
+    path('api/users/telegram/connect/', TelegramConnectView.as_view()),
+    path('api/users/telegram/confirm/', TelegramConfirmView.as_view()),
+    path('api/users/telegram/disconnect/', TelegramDisconnectView.as_view()),
+    path('api/users/telegram/test/', TelegramTestView.as_view()),
     
     # Finance Endpoints
     path('api/finance/', include(router.urls)),

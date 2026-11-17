@@ -38,13 +38,17 @@ Coolify construye `main` con Docker Compose. Backend aplica migraciones antes de
 
 Antes de migrar, respalda PostgreSQL con `pg_dump -Fc`. Las migraciones añadidas son aditivas. Comprueba `/api/health/`, la respuesta 401 de `/mcp` sin clave y el estado saludable de los cuatro servicios. Evita revertir el esquema para volver a una imagen previa; conserva el respaldo.
 
-El programador consulta cada minuto. La meditación se envía a las 07:00 `America/Mexico_City`, con una ventana de recuperación de dos horas. Hora y pausa se editan en Preferencias. Cada intento se reserva por usuario y fecha antes de contactar CallMeBot: reiniciar no duplica el mensaje; un envío de resultado incierto no se reintenta automáticamente. La aceptación del proveedor no acredita recepción en el teléfono. Una clave rechazada aparece como Requiere configuración.
+El programador consulta cada minuto. La meditación se envía a las 07:00 `America/Mexico_City`, con una ventana de recuperación de dos horas. Hora y pausa se editan en Preferencias. Cada intento se reserva por usuario y fecha antes de contactar al proveedor: reiniciar no duplica el mensaje; un envío de resultado incierto no se reintenta automáticamente. La aceptación del proveedor no acredita recepción en el teléfono. Una clave rechazada aparece como Requiere configuración.
+
+Telegram se conecta en Preferencias. Crea un bot exclusivo con `@BotFather` y `/newbot`, pega el token en el campo privado y abre el enlace que genera la guía. Pulsa Iniciar en Telegram y luego comprueba la conexión en la web. El enlace dura diez minutos, se usa una sola vez y sólo acepta el inicio desde un chat privado. El token se cifra con Fernet, usando una clave derivada del secreto de Django, y nunca se devuelve al navegador. Si cambias ese secreto tendrás que volver a ingresar el token. El bot no debe tener otro webhook o programa leyendo sus actualizaciones.
+
+Selecciona Telegram como canal de meditación y guarda el horario. La prueba de envío conserva un UUID para evitar duplicados si se reintenta. El recordatorio diario usa el mismo registro de intentos y continúa aunque los avisos de WhatsApp estén pausados. Desconectar Telegram borra el token y pausa su recordatorio. La cuenta Bmo411 usa Telegram por solicitud del propietario; las demás cuentas conservan su canal.
 
 ## Verificación
 
 ```powershell
 cd backend
-python manage.py test integrations life --noinput
+python manage.py test users.test_telegram integrations life --noinput
 python manage.py makemigrations --check --dry-run
 cd ../frontend
 npm run lint

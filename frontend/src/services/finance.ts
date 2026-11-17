@@ -225,6 +225,11 @@ export interface UserProfile {
     whatsapp_status: string;
     meditation_reminder_enabled: boolean;
     meditation_reminder_time: string;
+    meditation_channel: 'WHATSAPP' | 'TELEGRAM';
+    telegram_token_configured: boolean;
+    telegram_connected: boolean;
+    telegram_status: string;
+    telegram_bot_username: string;
     whatsapp_enabled: boolean;
 }
 

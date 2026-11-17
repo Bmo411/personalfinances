@@ -141,6 +141,7 @@ class MonthlyFocus(models.Model):
 class NotificationLog(models.Model):
     CHANNEL_CHOICES = (
         ('WHATSAPP', 'WhatsApp'),
+        ('TELEGRAM', 'Telegram'),
     )
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='life_notification_logs')

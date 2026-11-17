@@ -1,3 +1,4 @@
+import { TelegramSettings } from '../../components/guide/TelegramSettings';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -21,9 +22,10 @@ function PreferencesForm({ profile, financial }: { profile: UserProfile; financi
     const [key, setKey] = useState('');
     const [enabled, setEnabled] = useState(profile.whatsapp_enabled);
     const [meditation, setMeditation] = useState(profile.meditation_reminder_enabled);
+    const [channel, setChannel] = useState(profile.meditation_channel);
     const [time, setTime] = useState(profile.meditation_reminder_time.slice(0, 5));
     const [testMessage, setTestMessage] = useState('');
-    const payload = () => ({ whatsapp_phone: phone || null, ...(key ? { whatsapp_apikey: key } : {}), whatsapp_enabled: enabled, meditation_reminder_enabled: meditation, meditation_reminder_time: time + ':00' });
+    const payload = () => ({ whatsapp_phone: phone || null, ...(key ? { whatsapp_apikey: key } : {}), whatsapp_enabled: enabled, meditation_reminder_enabled: meditation, meditation_reminder_time: time + ':00', meditation_channel: channel });
     const save = useMutation({ mutationFn: () => financeService.updateUserProfile(payload()), onSuccess: () => { setKey(''); client.invalidateQueries({ queryKey: ['userProfile'] }); } });
     const test = useMutation({ mutationFn: async () => {
         await financeService.updateUserProfile(payload());
@@ -37,11 +39,19 @@ function PreferencesForm({ profile, financial }: { profile: UserProfile; financi
     ];
     return <div className="guide-page"><header className="page-heading"><div><p className="eyebrow">Tu guía, a tu ritmo</p><h1>Preferencias</h1></div><Link to="/integrations" className="subtle-link"><Plug size={16} />Integraciones</Link></header>
         <section className="surface"><h2 className="mb-5">Apariencia</h2><div className="flex gap-3"><button className={theme === 'dark' ? 'primary-button' : 'secondary-button'} onClick={() => setTheme('dark')}><Moon size={17} />Oscuro</button><button className={theme === 'light' ? 'primary-button' : 'secondary-button'} onClick={() => setTheme('light')}><Sun size={17} />Claro</button></div></section>
-        <section className="surface space-y-5"><div className="section-heading"><h2>Recordatorios por WhatsApp</h2><span className="small-tag">{profile.whatsapp_status === 'QUOTA_EXHAUSTED' ? 'Cupo agotado' : profile.whatsapp_status === 'RATE_LIMITED' ? 'Límite temporal' : profile.whatsapp_status === 'CONFIG_REQUIRED' ? 'Requiere configuración' : profile.whatsapp_status === 'ACCEPTED' ? 'Envío aceptado' : profile.whatsapp_status === 'UNVERIFIED' ? 'Sin verificar' : 'Revisar conexión'}</span></div><p className="text-muted">Avisos de pendientes, clases, gastos fijos y tarjetas. El recordatorio de meditación incluye la frase del día y una pregunta para reflexionar.</p>
+        <section className="surface space-y-5"><h2>Meditación diaria</h2><p className="text-muted">Una frase con autor y pasaje, una pregunta y el enlace a tu práctica. El programador funciona aunque tu PC esté apagada.</p>
+            <div className="grid sm:grid-cols-2 gap-4"><label className="field">Enviar mi recordatorio por<select aria-label="Enviar mi recordatorio por" value={channel} onChange={event => setChannel(event.target.value as 'WHATSAPP' | 'TELEGRAM')}><option value="TELEGRAM">Telegram</option><option value="WHATSAPP">WhatsApp</option></select></label><label className="field">Hora · Ciudad de México<input type="time" required value={time} onChange={event => setTime(event.target.value)} /></label></div>
+            <label className="check-label"><input type="checkbox" checked={meditation} onChange={event => setMeditation(event.target.checked)} />Recordatorio diario activo</label>
+            {channel === 'TELEGRAM' && !profile.telegram_connected && <p className="text-warning">Vincula tu chat en Conectar Telegram para poder recibir el recordatorio.</p>}
+            {channel === 'WHATSAPP' && !enabled && <p className="text-warning">Los avisos de WhatsApp están pausados. Actívalos sólo cuando tu proveedor vuelva a estar disponible.</p>}
+            <button className="primary-button" disabled={save.isPending || !time} onClick={() => save.mutate()}>{save.isPending ? 'Guardando…' : 'Guardar recordatorio'}</button>
+            {save.isSuccess && <p role="status" className="text-brand-700">Recordatorio guardado.</p>}{save.isError && <p className="form-error">{errorMessage(save.error)}</p>}
+        </section>
+        <TelegramSettings profile={profile} onDisconnect={() => setMeditation(false)} />
+        <section className="surface space-y-5"><div className="section-heading"><h2>Recordatorios por WhatsApp</h2><span className="small-tag">{profile.whatsapp_status === 'QUOTA_EXHAUSTED' ? 'Cupo agotado' : profile.whatsapp_status === 'RATE_LIMITED' ? 'Límite temporal' : profile.whatsapp_status === 'CONFIG_REQUIRED' ? 'Requiere configuración' : profile.whatsapp_status === 'ACCEPTED' ? 'Envío aceptado' : profile.whatsapp_status === 'UNVERIFIED' ? 'Sin verificar' : 'Revisar conexión'}</span></div><p className="text-muted">Avisos de pendientes, clases, gastos fijos y tarjetas. La meditación usa el canal que elegiste arriba.</p>
             {profile.whatsapp_status === 'QUOTA_EXHAUSTED' && <p className="text-warning">CallMeBot tiene el cupo de mensajes agotado. Revisa el servicio antes de reactivar los avisos. Tu práctica de meditación sigue disponible en la web.</p>}
             <label className="check-label"><input type="checkbox" checked={enabled} onChange={e => setEnabled(e.target.checked)} />Activar avisos por WhatsApp</label>
             <div className="grid sm:grid-cols-2 gap-4"><label className="field">Número con código de país<input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="+52…" /></label><label className="field">Clave de CallMeBot<input type="password" autoComplete="new-password" value={key} onChange={e => setKey(e.target.value)} placeholder={profile.whatsapp_key_configured ? 'Clave guardada · escribe para reemplazar' : 'Tu clave de CallMeBot'} /></label></div>
-            <div className="flex flex-wrap items-center gap-6"><label className="check-label"><input type="checkbox" checked={meditation} onChange={e => setMeditation(e.target.checked)} />Recordatorio diario de meditación</label><label className="field">Hora · Ciudad de México<input type="time" required value={time} onChange={e => setTime(e.target.value)} /></label></div>
             <div className="flex flex-wrap gap-3"><button className="primary-button" disabled={save.isPending || !time} onClick={() => save.mutate()}>{save.isPending ? 'Guardando…' : 'Guardar preferencias'}</button><button className="secondary-button" disabled={test.isPending || !phone || (!key && !profile.whatsapp_key_configured) || !time} onClick={() => test.mutate()}><Send size={16} />{test.isPending ? 'Enviando…' : 'Guardar y probar WhatsApp'}</button></div>
             {save.isSuccess && <p className="text-brand-700 flex gap-2"><Check size={16} />Preferencias guardadas.</p>}{(save.isError || test.isError) && <p className="form-error">{errorMessage(save.error || test.error)}</p>}{testMessage && <p className="text-brand-700">{testMessage}</p>}
             <a className="text-button" href="https://www.callmebot.com/blog/free-api-whatsapp-messages/" target="_blank" rel="noreferrer">Activación de CallMeBot</a>
