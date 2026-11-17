@@ -133,6 +133,7 @@ class IntegrationTests(APITestCase):
     @patch('life.notifications.send_whatsapp', return_value=('ACCEPTED', ''))
     def test_meditation_local_time_and_restart_do_not_duplicate(self, send):
         self.user.whatsapp_enabled = True
+        self.user.meditation_reminder_enabled = True
         local = timezone.make_aware(datetime.datetime(2026, 11, 16, 7, 0))
         send_meditation_reminder(self.user, local - datetime.timedelta(minutes=1))
         self.assertEqual(send.call_count, 0)
