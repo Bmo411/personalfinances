@@ -8,7 +8,7 @@ from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import ValidationError
 from rest_framework.renderers import JSONRenderer
 
-from finance.serializers import TransactionSerializer, AccountSerializer, CategorySerializer
+from finance.serializers import TransactionSerializer, AccountSerializer, CategorySerializer, DebtSerializer, RecurringIncomeSerializer, RecurringExpenseSerializer
 from finance.views import TransactionViewSet
 from life.serializers import WorkTaskSerializer
 from life.hub_serializers import ProjectSerializer, NoteSerializer, ProspectSerializer, WorkoutSerializer, MealSerializer, MeditationSerializer
@@ -19,6 +19,9 @@ RESOURCES = {
     'transactions': ('finance', TransactionSerializer),
     'accounts': ('finance', AccountSerializer),
     'categories': ('finance', CategorySerializer),
+    'debts': ('finance', DebtSerializer),
+    'recurring-incomes': ('finance', RecurringIncomeSerializer),
+    'recurring-expenses': ('finance', RecurringExpenseSerializer),
     'projects': ('organization', ProjectSerializer),
     'tasks': ('organization', WorkTaskSerializer),
     'notes': ('organization', NoteSerializer),

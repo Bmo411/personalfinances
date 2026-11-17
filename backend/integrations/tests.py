@@ -10,7 +10,7 @@ from django.db import close_old_connections
 from django.utils import timezone
 from rest_framework.test import APITestCase, APITransactionTestCase, APIClient
 
-from finance.models import Account, Category, Transaction
+from finance.models import Account, Category, Transaction, Debt, RecurringIncome
 from life.models import MathSnapshot, NotificationLog, Project, Meal
 from life.notifications import send_meditation_reminder
 from .auth import issue_key, SCOPES
@@ -172,6 +172,25 @@ class IntegrationTests(APITestCase):
         response = self.client.options('/api/integrations/records/workouts/')
         self.assertEqual(response.status_code, 200)
         self.assertIn('sets', response.data['fields'])
+
+    def test_debts_and_recurring_records_enforce_owner_scopes_and_replay(self):
+        nonce = str(uuid.uuid4())
+        data = {'name': 'Persona', 'type': 'I_OWE', 'total_amount': '5000.00', 'remaining_amount': '5000.00'}
+        first = self.post_record('debts', data, nonce)
+        self.assertEqual(first.status_code, 201, first.data)
+        self.assertEqual(self.post_record('debts', data, nonce).data, first.data)
+        self.assertEqual(Debt.objects.filter(user=self.user).count(), 1)
+        foreign = Debt.objects.create(user=self.other, name='Otra', type='I_OWE', total_amount=100, remaining_amount=100)
+        path = f'/api/integrations/records/debts/{foreign.pk}/'
+        self.assertEqual(self.client.get(path).status_code, 404)
+        self.assertEqual(self.client.patch(path, {'remaining_amount': '0'}, format='json', HTTP_IDEMPOTENCY_KEY=str(uuid.uuid4())).status_code, 404)
+        income = self.post_record('recurring-incomes', {'name': 'Sueldo', 'amount': '5000.00', 'due_day': 15, 'auto_create': False})
+        self.assertEqual(income.status_code, 201, income.data)
+        self.assertFalse(RecurringIncome.objects.get(pk=income.data['id']).auto_create)
+        self.key.scopes = ['organization:read', 'organization:write']
+        self.key.save()
+        for resource in ['debts', 'recurring-incomes', 'recurring-expenses']:
+            self.assertEqual(self.client.get(f'/api/integrations/records/{resource}/').status_code, 403)
 
 
 class ConcurrentMutationTests(APITransactionTestCase):

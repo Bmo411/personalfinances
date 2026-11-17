@@ -13,7 +13,7 @@ from starlette.responses import JSONResponse
 API_URL = os.environ.get('INTERNAL_API_URL', 'http://127.0.0.1:8000/api/integrations/').rstrip('/') + '/'
 PUBLIC_URL = os.environ.get('PUBLIC_URL', 'https://finance.blueberrieslab.com').rstrip('/')
 PUBLIC_HOST = PUBLIC_URL.split('://', 1)[-1]
-Resource = Literal['transactions', 'accounts', 'categories', 'projects', 'tasks', 'notes', 'prospects', 'workouts', 'meals', 'meditations']
+Resource = Literal['transactions', 'accounts', 'categories', 'debts', 'recurring-incomes', 'recurring-expenses', 'projects', 'tasks', 'notes', 'prospects', 'workouts', 'meals', 'meditations']
 Area = Literal['finance', 'organization', 'health', 'meditation', 'math']
 READ = ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
 WRITE = ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
